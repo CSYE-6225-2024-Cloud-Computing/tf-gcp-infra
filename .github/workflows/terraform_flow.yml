@@ -1,0 +1,25 @@
+name: Code Formatting
+on:
+  pull_request:
+    branches:
+      - main
+jobs:
+  build:
+    runs-on: ubuntu-latest
+ 
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+ 
+      - name: Terraform fmt
+        id: fmt
+        run: terraform fmt -check
+        continue-on-error: true
+ 
+      - name: Terraform Init
+        id: init
+        run: terraform init
+ 
+      - name: Terraform Validate
+        id: validate
+        run: terraform validate -no-color

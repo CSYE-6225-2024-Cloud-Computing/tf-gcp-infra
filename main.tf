@@ -44,7 +44,7 @@ resource "google_compute_subnetwork" "subnets" {
   ip_cidr_range            = var.ip_cidr_range[0]
   region                   = var.region
   network                  = each.value.self_link
-  private_ip_google_access = true
+  #private_ip_google_access = true
 }
 
 resource "google_compute_subnetwork" "subnets_db" {
@@ -54,7 +54,7 @@ resource "google_compute_subnetwork" "subnets_db" {
   ip_cidr_range            = var.ip_cidr_range[1]
   region                   = var.region
   network                  = each.value.self_link
-  private_ip_google_access = true
+  #private_ip_google_access = false
 }
 
 resource "google_compute_route" "webapp_route" {
@@ -65,113 +65,8 @@ resource "google_compute_route" "webapp_route" {
   dest_range      = "0.0.0.0/0"
   next_hop_gateway = "default-internet-gateway"
   priority        = 1000
+  tags = ["webapp"]
 }
 
 
 ############################################################################
-
-# VPC
-# resource "google_compute_network" "vpc_network" {
-#   name = "${var.name}-vpc"
-#   delete_default_routes_on_create = true
-#   auto_create_subnetworks = false
-#   routing_mode = "REGIONAL"
-# }
-
-# data "google_compute_zones" "available" {
-#   region  = var.region
-#   project = var.project_id
-# }
-
-# locals {
-#   type   = ["public-webapp", "private-db"]
-#   zones = data.google_compute_zones.available.names
-# }
-
-
-# # SUBNETS
-# resource"google_compute_subnetwork""subnets" {
-# count= 2
-# name="${var.name}-${local.type[count.index]}-subnetwork"
-# ip_cidr_range= var.ip_cidr_range[count.index]
-# region=var.region
-# network=google_compute_network.vpc_network.self_link
-# private_ip_google_access =true
-# }
-
-# #Route for Webapp Subnet
-# resource "google_compute_route" "webapp_route" {
-#   name            = "${var.name}-webapp-route"
-#   network         = google_compute_network.vpc_network.self_link
-#   dest_range      = "0.0.0.0/0"
-#   next_hop_gateway = "default-internet-gateway" 
-#   priority        = 1000
-# }
-############################################################################
-# NAT ROUTER
-# resource "google_compute_router" "nat_router" {
-#   name    = "${var.name}-${local.type[1]}-router"
-#   region  = var.region
-#   network = google_compute_network.vpc_network.self_link
-# }
-
-# data "google_compute_zones" "available" {
-#   region  = var.region
-#   project = var.project_id
-# }
-
-# locals {
-#   type   = ["public-webapp", "private-db"]
-#   zones = data.google_compute_zones.this.names
-#}
-
-# resource "google_compute_router_nat" "nat_configuration" {
-#   name                               = "${var.name}-${local.type[1]}-router-nat"
-#   router                             = google_compute_router.nat_router.name
-#   region                             = var.region
-#   nat_ip_allocate_option             = "AUTO_ONLY"
-#   source_subnetwork_ip_ranges_to_nat = "LIST_OF_SUBNETWORKS"
-#   subnetwork {
-#     name                             = "${var.name}-${local.type[1]}-subnetwork"
-#     source_ip_ranges_to_nat = ["ALL_IP_RANGES"]
-#   }
-# }
-
-
-
-
-
-
-
-# #Creating Main VPC
-# resource "google_compute_network" "vpc_network_main" {
-#   name                    = var.vpc_network_name# TODO: this can become as variable name, use the variables.tf file name and enter the key and value in this file
-#   auto_create_subnetworks = false
-#   routing_mode            = "REGIONAL"
-#   #delete_default_routes_on_create = true
-# }
-
-# # Creating the Public Subnet: webapp
-# resource "google_compute_subnetwork" "webapp_public_subnet" {
-#   name          = "webapp"
-#   ip_cidr_range = "10.0.1.0/24"
-#   network       = google_compute_network.vpc_network_main.id
-  
-# }
-
-# # Creating the Private Subnet: db
-# resource "google_compute_subnetwork" "db_private_subnet" {
-#   name          = "db"
-#   ip_cidr_range = "10.0.2.0/24"
-#   network       = google_compute_network.vpc_network_main.id
- 
-# }
-
-# # Adding a Route for the webapp Subnet
-# resource "google_compute_route" "" {
-#   name           = var.router_name # TODO: this can become as variable name, use the variables.tf file name and enter the key and value in this file
-#   network        = google_compute_network.vpc_network_main.id
-#   dest_range     = "0.0.0.0/0" # All possible ip's
-#   next_hop_gateway = "default-internet-gateway" # Read more, i dont know
-#   priority       = 1000 # this value indicates the serial order in which the rule will be applied.  
-# }
