@@ -37,10 +37,11 @@ This repository contains Terraform templates to set up networking resources such
 
 ### Directory Structure
 
-tf-gcp-infra/
-│
-├── main.tf # Main Terraform configuration file
-├── variables.tf # Define Terraform variables
-├── outputs.tf # Define Terraform outputs
-├── README.md # Detailed instructions for setup
-└── .gitignore # Git ignore file
+tf-gcp-infra
+1. main.tf # Main Terraform configuration file
+2. variables.tf # Define Terraform variables
+3. outputs.tf # Define Terraform outputs
+4. README.md # Detailed instructions for setup
+5. .gitignore # Git ignore file
+
+<hr>
