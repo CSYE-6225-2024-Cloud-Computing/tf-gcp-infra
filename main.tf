@@ -53,7 +53,7 @@ resource "google_compute_subnetwork" "subnets_db" {
   name          = "${each.key}-db-subnet"
   ip_cidr_range = var.ip_cidr_range[1]
   region        = var.region
-  network       = each.value.self_link
+  #network       = each.value.self_link
   #private_ip_google_access = false
 }
 
