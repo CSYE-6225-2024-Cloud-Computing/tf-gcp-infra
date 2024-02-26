@@ -1,8 +1,19 @@
 terraform {
-  required_providers {
+  # required_providers {
+  #   google = {
+  #     source  = "hashicorp/google"
+  #     version = "5.16.0"
+  #   }
+  # }
+
+required_providers {
     google = {
-      source  = "hashicorp/google"
-      version = "5.16.0"
+      source = "hashicorp/google"
+      version = "~>5"
+    }
+    google-beta = {
+      source = "hashicorp/google-beta"
+      version = "~>4"
     }
   }
 }
@@ -41,6 +52,7 @@ resource "google_service_networking_connection" "private_services_connection" {
   network                 = google_compute_network.vpcnetwork[count.index].id
   service                 = "servicenetworking.googleapis.com"
   reserved_peering_ranges = [google_compute_global_address.private_ip_address[count.index].name]
+  provider                = google-beta
 }
 
 resource "google_compute_subnetwork" "webapp" {
@@ -121,7 +133,7 @@ resource "google_sql_database" "cloudsql_database" {
 resource "random_password" "password" {
   length           = 16
   special          = true
-  override_special = "!#$%&*()-_=+[]{}<>:?"
+  override_special = "#$%&-_"
 }
 
 # Create CloudSQL Database User
@@ -129,7 +141,7 @@ resource "google_sql_user" "cloudsql_user" {
   count    = var.vpc_count
   name     = var.cloudsql_user_name
   instance = google_sql_database_instance.cloudsql_instance[count.index].name
-  password = var.db_password
+  password = random_password.password.result #var.db_password
 }
 
 #############################################################################
@@ -161,17 +173,13 @@ depends_on = [google_compute_subnetwork.webapp, google_sql_database_instance.clo
 exec >> /var/log/logfile.log 2>&1
 # Set your GCP-specific configurations
 DB_USERNAME=${google_sql_user.cloudsql_user[count.index].name}
-DB_PASSWORD=${var.db_password}
+DB_PASSWORD=${random_password.password.result}
 DB_HOST=${google_sql_database_instance.cloudsql_instance[count.index].private_ip_address}
 DB_NAME=${google_sql_database.cloudsql_database[count.index].name}
 POSTGRES_PORT=${var.postgres_port}
-PROJECT_ID=${var.project_id}
-REGION=${var.region}
-SERVER_PORT=${var.server_port}
 APP_USER=${var.app_user}
 APP_GROUP=${var.app_group}
-APP_DIR=${var.app_dir}
-ENV_DIR="/home/csye6225/webapp/.env"
+ENV_DIR="/home/csye6225/webapp/app/.env"
 
 # Change ENV owner and permissions
 sudo touch $ENV_DIR
@@ -180,7 +188,7 @@ sudo chmod 660 $ENV_DIR
 
 # Add ENV variables
 sudo echo POSTGRES_DATABASE_URL=postgresql://$DB_USERNAME:$DB_PASSWORD@$DB_HOST:$POSTGRES_PORT/$DB_NAME >> $ENV_DIR
-
+sleep 5
 # Restart systemd service
 sudo systemctl restart webapp.service
   EOF

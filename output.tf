@@ -7,7 +7,7 @@
 #   value = each.key
 # }
 
-# output "database_password" {
-#   value = random_password.db_password.result
-#   sensitive = true
-# }
+output "database_password" {
+  value = random_password.password.result
+  sensitive = true
+}
