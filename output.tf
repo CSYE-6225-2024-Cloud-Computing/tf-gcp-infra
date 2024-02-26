@@ -6,3 +6,8 @@
 # output "vpc_names" {
 #   value = each.key
 # }
+
+# output "database_password" {
+#   value = random_password.db_password.result
+#   sensitive = true
+# }
