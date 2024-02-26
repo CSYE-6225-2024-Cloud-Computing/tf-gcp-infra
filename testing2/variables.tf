@@ -79,7 +79,7 @@ variable "zone" {
 variable "packer_image" {
   type        = string
   description = "Custom image name for boot disk"
-  default     = "centos-8-packer-20240221074552" #centos-8-packer-20240221044109
+  default     = "centos-8-packer-20240224094059" #centos-8-packer-20240221044109
 }
 
 variable "initialize_params_size" {

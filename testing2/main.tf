@@ -69,6 +69,29 @@ resource "google_compute_firewall" "allow_web_traffic" {
   }
   source_ranges = ["0.0.0.0/0"]
 }
+
+################################################################################################
+# Create CloudSQL Instance
+resource "google_sql_database_instance" "cloudsql_instance" {
+  name               = "csye6225-cloudsql-instance"
+  database_version   = "POSTGRES_15"
+  deletion_protection = false
+  region             = var.region
+
+  settings {
+    tier             = "db-custom-1-3840"
+    availability_type = "regional"
+    disk_type        = "pd-ssd"
+    disk_size        = 100
+    ip_configuration {
+      ipv4_enabled    = false
+      private_network = google_compute_network.vpcnetwork[count.index].name
+    }
+  }
+}
+
+################################################################################################
+
  
 # Define Compute Engine instance
 resource "google_compute_instance" "my_instance" {
@@ -84,7 +107,7 @@ resource "google_compute_instance" "my_instance" {
       type  = var.initialize_params_type # Boot disk type
     }
   }
-  
+
   network_interface {
     subnetwork = google_compute_subnetwork.webapp[count.index].name # Assuming you have only one VPC network
     access_config {

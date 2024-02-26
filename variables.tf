@@ -79,7 +79,7 @@ variable "zone" {
 variable "packer_image" {
   type        = string
   description = "Custom image name for boot disk"
-  default     = "centos-8-packer-20240221081749" #centos-8-packer-20240221044109
+  default     = "centos-8-packer-20240224094059" #centos-8-packer-20240221044109
 }
 
 variable "initialize_params_size" {
@@ -172,3 +172,71 @@ variable "routing_mode" {
   default     = "REGIONAL"
 }
 
+variable "db_password" {
+  type        = string
+  description = "Custom image name for boot disk"
+  default     = "webapp"
+}
+
+
+variable "deletion_protection" {
+  description = "Enable or disable deletion protection for Cloud SQL instances"
+  type        = bool
+  default     = false
+}
+
+variable "disk_type" {
+  description = "Disk type for Cloud SQL instances"
+  type        = string
+  default     = "pd-ssd"
+}
+
+variable "disk_size" {
+  description = "Disk size for Cloud SQL instances"
+  type        = number
+  default     = 100
+}
+
+variable "disk_autoresize" {
+  description = "Enable or disable automatic disk resizing for Cloud SQL instances"
+  type        = bool
+  default     = true
+}
+
+
+variable "ipv4_enabled" {
+  description = "Enable or disable IPv4 for Cloud SQL instances"
+  type        = bool
+  default     = false
+}
+
+variable "instance_name" {
+  description = "Name of the Cloud SQL instance"
+  type        = string
+  default     = "csye6225-cloudsql-instance"
+}
+
+variable "database_version" {
+  description = "Database version for Cloud SQL instances"
+  type        = string
+  default     = "POSTGRES_15"
+}
+
+variable "tier" {
+  description = "Tier for Cloud SQL instances"
+  type        = string
+  default     = "db-f1-micro"
+}
+
+
+variable "cloudsql_database_name" {
+  description = "Name of the database to be created in Cloud SQL"
+  type        = string
+  default     = "webapp"
+}
+
+variable "cloudsql_user_name" {
+  description = "Name of the user to be created in Cloud SQL"
+  type        = string
+  default     = "webapp"
+}
