@@ -133,7 +133,7 @@ resource "google_sql_database" "cloudsql_database" {
 resource "random_password" "password" {
   length           = 16
   special          = true
-  override_special = "#$%&-_"
+  override_special = "()[]-_+{}"
 }
 
 # Create CloudSQL Database User
