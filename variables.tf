@@ -25,7 +25,7 @@ variable "vpc_names" {
 variable "region" {
   type        = string
   description = "GCP Region for this infrastructure"
-  default     = "us-central1"
+  default     = "us-west1"
 }
 
 variable "subnet_webapp_name" {
@@ -73,13 +73,13 @@ variable "machine_type" {
 variable "zone" {
   type        = string
   description = "GCP Zone for Compute Engine instance"
-  default     = "us-central1-a"
+  default     = "us-west1-b"
 }
 
 variable "packer_image" {
   type        = string
   description = "Custom image name for boot disk"
-  default     = "centos-8-packer-20240316042942" #centos-8-packer-20240221044109
+  default     = "centos-8-packer-20240320113621" #centos-8-packer-20240221044109
 }
 
 variable "initialize_params_size" {
@@ -239,4 +239,40 @@ variable "cloudsql_user_name" {
   description = "Name of the user to be created in Cloud SQL"
   type        = string
   default     = "webapp"
+}
+
+
+# Variable for the name of the managed DNS zone
+variable "managed_zone_name" {
+  type        = string
+  description = "Name of the managed DNS zone"
+  default     = "csye-zone"
+}
+
+# Variable for the DNS name associated with the managed zone
+variable "dns_name" {
+  type        = string
+  description = "DNS name associated with the managed zone"
+  default     = "sjaiswal.me."
+}
+
+# Variable for the name of the DNS record set
+variable "record_set_name" {
+  type        = string
+  description = "Name of the DNS record set"
+  default     = "csye6225-zone"
+}
+
+# Variable for the TTL (Time To Live) for the DNS record set
+variable "record_set_ttl" {
+  type        = number
+  description = "TTL for the DNS record set"
+  default     = 300
+}
+
+# Variable for the IP address of the Google Compute Engine instance
+variable "compute_instance_ip" {
+  type        = string
+  description = "IP address of the Google Compute Engine instance"
+  default     = "10.0.0.1"  # Update with the actual IP address
 }
