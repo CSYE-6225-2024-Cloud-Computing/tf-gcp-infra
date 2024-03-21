@@ -18,7 +18,6 @@ required_providers {
   }
 }
 
-
 #Provider Configuration
 provider "google" {
   #credentials = file("${path.module}/key.json")
@@ -26,8 +25,11 @@ provider "google" {
   region  = var.region     #"us-east1" # TODO: this can become as variable name, use the variables.tf file name and enter the key and value in this file
 }
 
+# data "template_file" "install" {
+#   template = file("${path.module}/startuptesting.sh")
+# }
 
-
+#Define network resources
 resource "google_compute_network" "vpcnetwork" {
   count                           = var.vpc_count
   project                         = var.project_id
@@ -133,7 +135,7 @@ resource "google_sql_database" "cloudsql_database" {
 resource "random_password" "password" {
   length           = 16
   special          = true
-  override_special = "()[]-_+{}"
+  override_special = "-_"
 }
 
 # Create CloudSQL Database User
@@ -143,6 +145,31 @@ resource "google_sql_user" "cloudsql_user" {
   instance = google_sql_database_instance.cloudsql_instance[count.index].name
   password = random_password.password.result #var.db_password
 }
+
+#############################################################################
+
+# Create Service Account for Virtual Machine
+resource "google_service_account" "vm_service_account" {
+  account_id   = "vm-service-account"
+  display_name = "VM Service Account"
+}
+
+# Bind IAM Role to the Service Account
+resource "google_project_iam_binding" "service_account_iam_binding" {
+  project = var.project_id
+
+  role   = "roles/logging.admin"
+  members = ["serviceAccount:${google_service_account.vm_service_account.email}"]
+}
+
+resource "google_project_iam_binding" "metric_writer_iam_binding" {
+  project = var.project_id
+
+  role   = "roles/monitoring.metricWriter"
+  members = ["serviceAccount:${google_service_account.vm_service_account.email}"]
+}
+
+
 
 #############################################################################
 
@@ -165,13 +192,17 @@ resource "google_compute_instance" "my_instance" {
     subnetwork = google_compute_subnetwork.webapp[count.index].name # Assuming you have only one VPC network
     access_config {}
   }
-depends_on = [google_compute_subnetwork.webapp, google_sql_database_instance.cloudsql_instance]
 
+
+  # Service account for the compute instance
+  service_account {
+    email  = google_service_account.vm_service_account.email
+    scopes = ["https://www.googleapis.com/auth/logging.write", "https://www.googleapis.com/auth/monitoring.write"]
+  }
 
   metadata_startup_script = <<-EOF
 #!/bin/bash
-exec >> /var/log/logfile.log 2>&1
-# Set your GCP-specific configurations
+exec >> /tmp/logfile.log 2>&1
 DB_USERNAME=${google_sql_user.cloudsql_user[count.index].name}
 DB_PASSWORD=${random_password.password.result}
 DB_HOST=${google_sql_database_instance.cloudsql_instance[count.index].private_ip_address}
@@ -180,16 +211,29 @@ POSTGRES_PORT=${var.postgres_port}
 APP_USER=${var.app_user}
 APP_GROUP=${var.app_group}
 ENV_DIR="/home/csye6225/webapp/app/.env"
-
-# Change ENV owner and permissions
 sudo touch $ENV_DIR
 sudo chown $APP_USER:$APP_GROUP $ENV_DIR
-sudo chmod 660 $ENV_DIR
-
-# Add ENV variables
+sudo chmod 755 $ENV_DIR
 sudo echo POSTGRES_DATABASE_URL=postgresql://$DB_USERNAME:$DB_PASSWORD@$DB_HOST:$POSTGRES_PORT/$DB_NAME >> $ENV_DIR
 sleep 5
-# Restart systemd service
 sudo systemctl restart webapp.service
   EOF
+depends_on = [google_compute_subnetwork.webapp, google_sql_database_instance.cloudsql_instance, google_service_account.vm_service_account]
 }
+
+
+#############################################################################
+
+# Update Cloud DNS zone using Terraform to add or update A records
+
+resource "google_dns_record_set" "csye6225" {
+  count        = var.vpc_count
+  name         = "sjaiswal.me."
+  type        = "A"
+  ttl         = 21600
+  managed_zone = "csye-zone"
+  rrdatas     = [google_compute_instance.my_instance[count.index].network_interface[0].access_config[0].nat_ip]
+  depends_on = [google_compute_instance.my_instance]
+}
+
+#############################################################################
