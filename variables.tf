@@ -16,11 +16,6 @@ variable "vpc_names" {
   default     = ["vpc-1", "vpc-2"]
 }
 
-# variable "project" {
-#   type        = string
-#   description = "GCP Project ID"
-#   default     = "your-gcp-project-id"
-# }
 
 variable "region" {
   type        = string
@@ -79,7 +74,8 @@ variable "zone" {
 variable "packer_image" {
   type        = string
   description = "Custom image name for boot disk"
-  default     = "centos-8-packer-20240320113621" #centos-8-packer-20240221044109
+  default     = "centos-8-packer-20240327092458" #centos-8-packer-20240327021420 
+  
 }
 
 variable "initialize_params_size" {
@@ -276,3 +272,126 @@ variable "compute_instance_ip" {
   description = "IP address of the Google Compute Engine instance"
   default     = "10.0.0.1"  # Update with the actual IP address
 }
+
+########################### PUB/SUB Variables ##############################
+
+variable "pubsub_topic"{
+  description = "pubsub topic"
+  type        = string
+  default     = "verify_email"
+}
+
+variable "retention_time"{
+  description = "retention_time"
+  type        = string
+  default     = "604800s"
+}
+
+variable "pubsub_publisher"{
+  description = "pubsub.publisher"
+  type        = string
+  default     = "roles/pubsub.publisher"
+}
+
+########################### Bucket and files Variables ##############################
+
+variable "cloud_platform_scope" {
+  description = "The scope for the service account, such as 'cloud-platform'."
+  type        = string
+  default     = "cloud-platform"
+}
+
+variable "bucket_location"{
+  description = "pubsub location"
+  type        = string
+  default     = "US"
+}
+
+variable "archive_output_path"{
+  description = "archive_file"
+  type        = string
+  default     = "/tmp/serverless-fork.zip"
+}
+
+variable "archive_source_file"{
+  description = "archive_file"
+  type        = string
+  default     = "/Users/shreyajaiswal/Downloads/serverless-fork" 
+}
+
+variable "archive_file_name"{
+  description = "archive_file"
+  type        = string
+  default     = "serverless-fork.zip"
+}
+
+########################### Cloud Function Variables ##############################
+variable "cloud_function_name" {
+  description = "Name of the Cloud Function"
+  type        = string
+  default     = "cloud-function-webapp"
+}
+
+variable "cloud_runtime" {
+  description = "Runtime for the Cloud Function"
+  type        = string
+  default     = "python39"
+}
+
+variable "cloud_entry_point" {
+  description = "Entry point for the Cloud Function"
+  type        = string
+  default     = "verify_useremail"
+}
+
+variable "cloud_event_type" {
+  description = "Event type for the Cloud Function trigger"
+  type        = string
+  default     = "google.cloud.pubsub.topic.v1.messagePublished" 
+}
+
+variable "cloud_retry_policy" {
+  description = "Retry policy for the Cloud Function trigger"
+  type        = string
+  default     = "RETRY_POLICY_RETRY"
+}
+
+# variable "cloud_function_memory"{
+#   description = "cloud_function_memory"
+#   type        = number
+#   default     = "256M"
+# }
+
+variable "cloud_function_timeout"{
+  description = "cloud_function_timeout"
+  type        = number
+  default     = 60
+}
+
+variable "cloud_function_object"{
+  description = "cloud_function_object"
+  type        = string
+  default     = "function-source.zip"
+}
+
+
+variable "cloud_function_role"{
+  description = "cloud_function_role"
+  type        = string
+  default     = "roles/viewer"
+}
+
+
+########################### ENV Variables ##############################
+variable "MAILGUN_API_KEY"{
+  description = "mailgun-api-key"
+  type        = string
+  default     = "4de658fabd37ad41a0cc1666f49e8e51-f68a26c9-ab63ee66"
+}
+
+variable "connector_name" {
+  description = "Name of the VPC Network Connector in GCP"
+  type        = string
+  default     = "vpc_conn"
+}
+
