@@ -189,6 +189,31 @@ resource "google_project_iam_binding" "viewer_role_binding" {
 
 ############################################## GOOGLE COMPUTE INSTANCE #############################################
 
+# Create Service Account for Virtual Machine
+resource "google_service_account" "vm_service_account" {
+  account_id   = "vm-service-account"
+  display_name = "VM Service Account"
+}
+
+# Bind IAM Role to the Service Account
+resource "google_project_iam_binding" "service_account_iam_binding" {
+  project = var.project_id
+
+  role   = "roles/logging.admin"
+  members = ["serviceAccount:${google_service_account.vm_service_account.email}"]
+}
+
+resource "google_project_iam_binding" "metric_writer_iam_binding" {
+  project = var.project_id
+
+  role   = "roles/monitoring.metricWriter"
+  members = ["serviceAccount:${google_service_account.vm_service_account.email}"]
+}
+
+
+
+#############################################################################
+
 # Define Compute Engine instance
 resource "google_compute_instance" "my_instance" {
   count        = var.vpc_count
@@ -214,6 +239,7 @@ resource "google_compute_instance" "my_instance" {
   service_account {
     email  = google_service_account.vm_service_account.email
     scopes = ["https://www.googleapis.com/auth/logging.write", "https://www.googleapis.com/auth/monitoring.write", "https://www.googleapis.com/auth/pubsub"]
+
   }
 
   metadata_startup_script = <<-EOF
@@ -236,6 +262,7 @@ sleep 5
 sudo systemctl restart webapp.service
   EOF
 depends_on = [google_compute_subnetwork.webapp, google_sql_database_instance.cloudsql_instance, google_service_account.vm_service_account]
+
 }
 
 
@@ -349,7 +376,3 @@ resource "google_cloudfunctions2_function" "function" {
   }
   depends_on   = [google_vpc_access_connector.connector]
 }
-
-
-
-
