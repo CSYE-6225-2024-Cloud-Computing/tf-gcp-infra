@@ -187,31 +187,6 @@ resource "google_project_iam_binding" "viewer_role_binding" {
 
 
 
-############################################## GOOGLE COMPUTE INSTANCE #############################################
-
-# Create Service Account for Virtual Machine
-resource "google_service_account" "vm_service_account" {
-  account_id   = "vm-service-account"
-  display_name = "VM Service Account"
-}
-
-# Bind IAM Role to the Service Account
-resource "google_project_iam_binding" "service_account_iam_binding" {
-  project = var.project_id
-
-  role   = "roles/logging.admin"
-  members = ["serviceAccount:${google_service_account.vm_service_account.email}"]
-}
-
-resource "google_project_iam_binding" "metric_writer_iam_binding" {
-  project = var.project_id
-
-  role   = "roles/monitoring.metricWriter"
-  members = ["serviceAccount:${google_service_account.vm_service_account.email}"]
-}
-
-
-
 #############################################################################
 
 # Define Compute Engine instance
