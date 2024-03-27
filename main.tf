@@ -102,7 +102,7 @@ resource "google_compute_firewall" "allow_web_traffic" {
 }
 
 
-#############################################################################
+############################################# GOOGLE SQL DATABASE INSTANCE #############################################
 
 resource "google_sql_database_instance" "cloudsql_instance" {
   depends_on          = [google_service_networking_connection.private_services_connection]
@@ -146,12 +146,12 @@ resource "google_sql_user" "cloudsql_user" {
   password = random_password.password.result #var.db_password
 }
 
-#############################################################################
+############################################# VM SERVICE ACCOUNT #############################################
 
 # Create Service Account for Virtual Machine
 resource "google_service_account" "vm_service_account" {
-  account_id   = "vm-service-account"
-  display_name = "VM Service Account"
+  account_id   = "sj-service-account"
+  display_name = "SJ Service Account"
 }
 
 # Bind IAM Role to the Service Account
@@ -166,6 +166,22 @@ resource "google_project_iam_binding" "metric_writer_iam_binding" {
   project = var.project_id
 
   role   = "roles/monitoring.metricWriter"
+  members = ["serviceAccount:${google_service_account.vm_service_account.email}"]
+}
+
+# Grant Cloud Run Invoker role to the Service Account
+resource "google_project_iam_binding" "cloud_run_invoker_binding" {
+  project = var.project_id
+
+  role    = "roles/run.invoker"
+  members = ["serviceAccount:${google_service_account.vm_service_account.email}"]
+}
+
+# Grant Viewer role to the Service Account
+resource "google_project_iam_binding" "viewer_role_binding" {
+  project = var.project_id
+
+  role    = "roles/viewer"
   members = ["serviceAccount:${google_service_account.vm_service_account.email}"]
 }
 
@@ -197,7 +213,8 @@ resource "google_compute_instance" "my_instance" {
   # Service account for the compute instance
   service_account {
     email  = google_service_account.vm_service_account.email
-    scopes = ["https://www.googleapis.com/auth/logging.write", "https://www.googleapis.com/auth/monitoring.write"]
+    scopes = ["https://www.googleapis.com/auth/logging.write", "https://www.googleapis.com/auth/monitoring.write", "https://www.googleapis.com/auth/pubsub"]
+
   }
 
   metadata_startup_script = <<-EOF
@@ -215,14 +232,16 @@ sudo touch $ENV_DIR
 sudo chown $APP_USER:$APP_GROUP $ENV_DIR
 sudo chmod 755 $ENV_DIR
 sudo echo POSTGRES_DATABASE_URL=postgresql://$DB_USERNAME:$DB_PASSWORD@$DB_HOST:$POSTGRES_PORT/$DB_NAME >> $ENV_DIR
+sudo echo GCP_PROJECT_ID=${var.project_id} >> $ENV_DIR
 sleep 5
 sudo systemctl restart webapp.service
   EOF
 depends_on = [google_compute_subnetwork.webapp, google_sql_database_instance.cloudsql_instance, google_service_account.vm_service_account]
+
 }
 
 
-#############################################################################
+############################################## GOOGLE DNS RECORD SET #############################################
 
 # Update Cloud DNS zone using Terraform to add or update A records
 
@@ -236,4 +255,99 @@ resource "google_dns_record_set" "csye6225" {
   depends_on = [google_compute_instance.my_instance]
 }
 
-#############################################################################
+############################################## PUB/SUB - TOPIC #############################################
+
+resource "google_pubsub_topic" "verify_email" {
+  name = var.pubsub_topic
+
+  labels = {
+    foo = "bar"
+  }
+  message_retention_duration = var.retention_time
+}
+
+resource "google_pubsub_topic_iam_binding" "binding" {
+  project = var.project_id
+  topic = google_pubsub_topic.verify_email.name
+  role  = var.pubsub_publisher
+  members = [
+    "serviceAccount:${google_service_account.vm_service_account.email}",
+  ]
+}
+
+############################################## BUCKET VARIABLES #############################################
+
+resource "random_id" "bucket_suffix" {
+  byte_length = 8
+}
+resource "google_storage_bucket" "bucket" {
+  name     = "csye-webapp-${random_id.bucket_suffix.hex}"
+  location = var.bucket_location
+}
+
+# resource "google_storage_bucket_object" "object" {
+#   name   = "function-source.zip"
+#   bucket = google_storage_bucket.bucket.name
+#   source = "function-source.zip"  # Add path to the zipped function source code
+# }
+
+
+########################################### VPC CONNECT #############################################
+
+resource "google_vpc_access_connector" "connector" {
+  count        = var.vpc_count
+  name          = "connector"
+  ip_cidr_range = "10.8.0.0/28"
+  network     = google_compute_network.vpcnetwork[count.index].self_link
+}
+
+
+########################################## CLOUD FUNCTION VARIABLES ###################################
+
+resource "google_cloudfunctions2_function" "function" {
+  count = var.vpc_count
+  name = var.cloud_function_name
+  location = var.region
+  description = "a new function"
+
+  build_config {
+    runtime = var.cloud_runtime
+    entry_point = var.cloud_entry_point # Set the entry point 
+    source {
+      storage_source {
+        bucket = google_storage_bucket.bucket.name
+        object = var.cloud_function_object
+      }
+    }
+    environment_variables = {
+    DB_USERNAME=google_sql_user.cloudsql_user[count.index].name,
+    DB_PASSWORD=google_sql_user.cloudsql_user[count.index].password,
+    DB_HOST=google_sql_database_instance.cloudsql_instance[count.index].private_ip_address,
+    DB_NAME=google_sql_database.cloudsql_database[count.index].name,
+    MAILGUN_API_KEY=var.MAILGUN_API_KEY,
+    DB_PORT = var.postgres_port
+    }
+  }
+
+  service_config {
+    max_instance_count  = 3
+    min_instance_count = 1
+    available_memory    = "256M"
+    timeout_seconds     = 60
+    environment_variables = {
+      SERVICE_CONFIG_TEST = "config_test"
+    }
+    ingress_settings = "ALLOW_INTERNAL_ONLY"
+    vpc_connector = "projects/dev-gcp-project-414615/locations/us-west1/connectors/connector" 
+    all_traffic_on_latest_revision = true
+    service_account_email = google_service_account.vm_service_account.email
+  }
+
+  event_trigger {
+    trigger_region = var.region
+    event_type = var.cloud_event_type
+    pubsub_topic = google_pubsub_topic.verify_email.id
+    retry_policy = var.cloud_retry_policy
+  }
+  depends_on   = [google_vpc_access_connector.connector]
+}
