@@ -9,3 +9,9 @@ ta:
 
 td:
 	terraform destroy --auto-approve
+
+tv:
+	terraform validate
+
+tf:
+	terraform fmt

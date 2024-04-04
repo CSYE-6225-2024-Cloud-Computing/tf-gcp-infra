@@ -1,78 +1,78 @@
-terraform {
-  # required_providers {
-  #   google = {
-  #     source  = "hashicorp/google"
-  #     version = "5.16.0"
-  #   }
-  # }
 
-required_providers {
-    google = {
-      source = "hashicorp/google"
-      version = "~>5"
-    }
-    google-beta = {
-      source = "hashicorp/google-beta"
-      version = "~>4"
-    }
-  }
-}
+# ############################################# VPC NETWORK CONNECTION #############################################
 
-#Provider Configuration
-provider "google" {
-  #credentials = file("${path.module}/key.json")
-  project = var.project_id #"csy-6225-sj" # TODO: this can become as variable name, use the variables.tf file name and enter the key and value in this file
-  region  = var.region     #"us-east1" # TODO: this can become as variable name, use the variables.tf file name and enter the key and value in this file
-}
-
-# data "template_file" "install" {
-#   template = file("${path.module}/startuptesting.sh")
-# }
-
-#Define network resources
 resource "google_compute_network" "vpcnetwork" {
   count                           = var.vpc_count
   project                         = var.project_id
   name                            = var.vpc_names[count.index]
-  auto_create_subnetworks         = false
+  auto_create_subnetworks         = var.auto_create_subnetworks
   mtu                             = 1460
   routing_mode                    = var.routing_mode
   delete_default_routes_on_create = true
 }
 
+# ############################################# ADDING FIREWALL #############################################
+
+resource "google_compute_firewall" "allow_web_traffic" {
+  count   = var.vpc_count
+  name    = "allow-web-traffic-${count.index}"
+  network = google_compute_network.vpcnetwork[count.index].self_link
+
+  allow {
+    protocol = "icmp"
+  }
+
+  allow {
+    protocol = var.allow_protocol
+    ports    = var.allowed_ports
+  }
+  source_ranges = ["0.0.0.0/0"]
+  priority      = var.allow_priority
+}
+
+resource "google_compute_firewall" "deny_all_traffic" {
+  count       = var.vpc_count
+  name        = "deny-all-traffic-${count.index}"
+  network     = google_compute_network.vpcnetwork[count.index].self_link
+  target_tags = ["webapp"]
+
+  deny {
+    protocol = var.deny_protocol
+  }
+
+  source_ranges = ["0.0.0.0/0"]
+
+  priority = var.deny_priority
+}
+
+# ############################################# WEBAPP SUBNET #####################################################
+
+resource "google_compute_subnetwork" "webapp" {
+  count         = var.vpc_count
+  name          = var.subnet_webapp_name[count.index]
+  ip_cidr_range = var.subnet_CIDR_webapp[count.index]
+  region        = var.region
+  network       = google_compute_network.vpcnetwork[count.index].id
+}
+# ############################################# GLOBAL ADDRESS AND NETWORKING  CONNECTION ########################
+
 resource "google_compute_global_address" "private_ip_address" {
   count         = var.vpc_count
   name          = "private-ip-address"
-  purpose       = "VPC_PEERING"
-  address_type  = "INTERNAL"
-  prefix_length = 16
+  purpose       = var.private_ip_address_purpose
+  address_type  = var.private_ip_address_type
+  prefix_length = var.private_ip_address_prefix_length
   network       = google_compute_network.vpcnetwork[count.index].id
 }
 
-resource "google_service_networking_connection" "private_services_connection" {
+resource "google_service_networking_connection" "private_vpc_connection" {
   count                   = var.vpc_count
   network                 = google_compute_network.vpcnetwork[count.index].id
-  service                 = "servicenetworking.googleapis.com"
+  service                 = var.service_name
   reserved_peering_ranges = [google_compute_global_address.private_ip_address[count.index].name]
-  provider                = google-beta
 }
 
-resource "google_compute_subnetwork" "webapp" {
-  count                    = var.vpc_count
-  name                     = var.subnet_webapp_name[count.index]
-  ip_cidr_range            = var.subnet_CIDR_webapp[count.index]
-  region                   = var.region
-  network                  = google_compute_network.vpcnetwork[count.index].id
-}
-
-resource "google_compute_subnetwork" "subnet_db" {
-  count                    = var.vpc_count
-  name                     = var.subnet_db_name[count.index]
-  ip_cidr_range            = var.subnet_CIDR_db[count.index]
-  region                   = var.region
-  network                  = google_compute_network.vpcnetwork[count.index].id
-  private_ip_google_access = true
-}
+# ############################################# WEBAPP ROUTE ############################################
 
 resource "google_compute_route" "webapp_route" {
   count            = var.vpc_count
@@ -81,42 +81,23 @@ resource "google_compute_route" "webapp_route" {
   dest_range       = "0.0.0.0/0"
   next_hop_gateway = "global/gateways/default-internet-gateway"
   priority         = 1000
-  tags             = ["webapp"]
 }
 
-# Define firewall rule
-resource "google_compute_firewall" "allow_web_traffic" {
-  count       = var.vpc_count
-  name        = "allow-web-traffic"
-  network     = google_compute_network.vpcnetwork[count.index].self_link
-  target_tags = ["webapp"]
-  allow {
-    protocol = "icmp"
-  }
-
-  allow {
-    protocol = "tcp"
-    ports    = ["22", "80", tostring(var.server_port)]
-  }
-  source_ranges = ["0.0.0.0/0"]
-}
-
-
-############################################# GOOGLE SQL DATABASE INSTANCE #############################################
+# ############################################# GOOGLE SQL DATABASE INSTANCE #############################################
 
 resource "google_sql_database_instance" "cloudsql_instance" {
-  depends_on          = [google_service_networking_connection.private_services_connection]
+  depends_on          = [google_service_networking_connection.private_vpc_connection]
   count               = var.vpc_count
   name                = var.instance_name
   database_version    = var.database_version
-  deletion_protection = var.deletion_protection 
+  deletion_protection = var.deletion_protection
   region              = var.region
   settings {
     tier              = var.tier
     availability_type = var.routing_mode
     disk_type         = var.disk_type
     disk_size         = var.disk_size
-    disk_autoresize = var.disk_autoresize
+    disk_autoresize   = var.disk_autoresize
     ip_configuration {
       ipv4_enabled    = var.ipv4_enabled
       private_network = google_compute_network.vpcnetwork[count.index].id
@@ -146,116 +127,268 @@ resource "google_sql_user" "cloudsql_user" {
   password = random_password.password.result #var.db_password
 }
 
-############################################# VM SERVICE ACCOUNT #############################################
 
-# Create Service Account for Virtual Machine
-resource "google_service_account" "vm_service_account" {
-  account_id   = "sj-service-account"
-  display_name = "SJ Service Account"
+# #############################################  SERVICE ACCOUNT  #############################################
+
+resource "google_service_account" "service_account" {
+  account_id   = "jais-service-account"
+  display_name = "jaiswal-service-account"
 }
 
-# Bind IAM Role to the Service Account
-resource "google_project_iam_binding" "service_account_iam_binding" {
+
+resource "google_project_iam_binding" "metricWriter" {
   project = var.project_id
+  role    = "roles/monitoring.metricWriter"
 
-  role   = "roles/logging.admin"
-  members = ["serviceAccount:${google_service_account.vm_service_account.email}"]
+  members = [
+    "serviceAccount:${google_service_account.service_account.email}",
+  ]
 }
 
-resource "google_project_iam_binding" "metric_writer_iam_binding" {
+resource "google_project_iam_binding" "Logging_Admin" {
   project = var.project_id
+  role    = "roles/logging.admin"
 
-  role   = "roles/monitoring.metricWriter"
-  members = ["serviceAccount:${google_service_account.vm_service_account.email}"]
+  members = [
+    "serviceAccount:${google_service_account.service_account.email}",
+  ]
 }
 
-# Grant Cloud Run Invoker role to the Service Account
-resource "google_project_iam_binding" "cloud_run_invoker_binding" {
-  project = var.project_id
+# #############################################  COMPUTE REGION INSTANCE TEMPLATE #############################################
 
-  role    = "roles/run.invoker"
-  members = ["serviceAccount:${google_service_account.vm_service_account.email}"]
-}
-
-# Grant Viewer role to the Service Account
-resource "google_project_iam_binding" "viewer_role_binding" {
-  project = var.project_id
-
-  role    = "roles/viewer"
-  members = ["serviceAccount:${google_service_account.vm_service_account.email}"]
-}
-
-
-
-#############################################################################
-
-# Define Compute Engine instance
-resource "google_compute_instance" "my_instance" {
-  count        = var.vpc_count
-  name         = var.my_instance_name
-  machine_type = var.machine_type
-  zone         = var.zone
-  tags         = ["webapp"]
-  boot_disk {
-    initialize_params {
-      image = var.packer_image           # Custom image name
-      size  = var.initialize_params_size # Boot disk size in GB
-      type  = var.initialize_params_type # Boot disk type
+resource "google_compute_region_instance_template" "vm_template" {
+  count                = var.vpc_count
+  name                 = "webapp-template"
+  description          = "This template is used to create webapp server instances."
+  instance_description = "description assigned to instances"
+  machine_type         = var.machine_type
+  can_ip_forward       = false
+  tags                 = ["web-servers"]
+  # scheduling {
+  #   automatic_restart   = true
+  #   on_host_maintenance = "MIGRATE"
+  # }
+  disk {
+    source_image = var.packer_image
+    auto_delete  = true
+    boot         = true
+    disk_size_gb = var.initialize_params_size # Boot disk size in GB
+    disk_type    = var.initialize_params_type
+  }
+  network_interface {
+    subnetwork = google_compute_subnetwork.webapp[count.index].id
+    network    = google_compute_network.vpcnetwork[count.index].id
+    access_config {
+      network_tier = "STANDARD"
     }
   }
 
-  network_interface {
-    subnetwork = google_compute_subnetwork.webapp[count.index].name # Assuming you have only one VPC network
-    access_config {}
-  }
-
-
-  # Service account for the compute instance
-  service_account {
-    email  = google_service_account.vm_service_account.email
-    scopes = ["https://www.googleapis.com/auth/logging.write", "https://www.googleapis.com/auth/monitoring.write", "https://www.googleapis.com/auth/pubsub"]
-
-  }
-
   metadata_startup_script = <<-EOF
-#!/bin/bash
-exec >> /tmp/logfile.log 2>&1
-DB_USERNAME=${google_sql_user.cloudsql_user[count.index].name}
-DB_PASSWORD=${random_password.password.result}
-DB_HOST=${google_sql_database_instance.cloudsql_instance[count.index].private_ip_address}
-DB_NAME=${google_sql_database.cloudsql_database[count.index].name}
-POSTGRES_PORT=${var.postgres_port}
-APP_USER=${var.app_user}
-APP_GROUP=${var.app_group}
-ENV_DIR="/home/csye6225/webapp/app/.env"
-sudo touch $ENV_DIR
-sudo chown $APP_USER:$APP_GROUP $ENV_DIR
-sudo chmod 755 $ENV_DIR
-sudo echo POSTGRES_DATABASE_URL=postgresql://$DB_USERNAME:$DB_PASSWORD@$DB_HOST:$POSTGRES_PORT/$DB_NAME >> $ENV_DIR
-sudo echo GCP_PROJECT_ID=${var.project_id} >> $ENV_DIR
-sleep 5
-sudo systemctl restart webapp.service
+    #!/bin/bash
+    exec >> /tmp/logfile.log 2>&1
+    DB_USERNAME=${google_sql_user.cloudsql_user[count.index].name}
+    DB_PASSWORD=${random_password.password.result}
+    DB_HOST=${google_sql_database_instance.cloudsql_instance[count.index].private_ip_address}
+    DB_NAME=${google_sql_database.cloudsql_database[count.index].name}
+    POSTGRES_PORT=${var.postgres_port}
+    APP_USER=${var.app_user}
+    APP_GROUP=${var.app_group}
+    ENV_DIR="/home/csye6225/webapp/app/.env"
+    sudo touch $ENV_DIR
+    sudo chown $APP_USER:$APP_GROUP $ENV_DIR
+    sudo chmod 755 $ENV_DIR
+    sudo echo POSTGRES_DATABASE_URL=postgresql://$DB_USERNAME:$DB_PASSWORD@$DB_HOST:$POSTGRES_PORT/$DB_NAME >> $ENV_DIR
+    sudo echo GCP_PROJECT_ID=${var.project_id} >> $ENV_DIR
+    sleep 5
+    sudo systemctl restart webapp.service
   EOF
-depends_on = [google_compute_subnetwork.webapp, google_sql_database_instance.cloudsql_instance, google_service_account.vm_service_account]
+
+  service_account {
+    email  = google_service_account.service_account.email
+    scopes = ["cloud-platform"]
+  }
+  depends_on = [google_sql_database_instance.cloudsql_instance, google_service_account.service_account]
 
 }
 
 
-############################################## GOOGLE DNS RECORD SET #############################################
+################################## HEALTH CHECK ##################################
+
+resource "google_compute_health_check" "http-health-check" {
+  name        = "http-health-check"
+  description = "Health check via http"
+
+  timeout_sec         = 5
+  check_interval_sec  = 15
+  healthy_threshold   = 4
+  unhealthy_threshold = 4
+
+  http_health_check {
+    port               = 8000
+    port_specification = "USE_FIXED_PORT"
+    # host               = "1.2.3.4"
+    request_path = "/healthz/"
+    #response     = ""
+  }
+  log_config {
+    enable = true
+  }
+
+}
+
+################################## HEALTH CHECK FIREWALL ##################################
+resource "google_compute_firewall" "health-check" {
+  count = var.vpc_count
+  name  = "fw-allow-health-check"
+  allow {
+    protocol = "tcp"
+    ports    = ["80", "443", "8000"] # Replace with your health check ports
+  }
+  direction     = "INGRESS"
+  network       = google_compute_network.vpcnetwork[count.index].id
+  priority      = 1000
+  source_ranges = ["130.211.0.0/22", "35.191.0.0/16"]
+  target_tags   = ["web-servers"]
+}
+######################################## REGION AUTOSCALAR ########################################
+
+resource "google_compute_region_autoscaler" "autoscaler" {
+  count  = var.vpc_count
+  name   = "my-region-autoscaler"
+  region = var.region
+  target = google_compute_region_instance_group_manager.appserver[count.index].id
+
+  autoscaling_policy {
+    max_replicas    = 5
+    min_replicas    = 1
+    cooldown_period = 60
+
+    cpu_utilization {
+      target = 0.05
+    }
+  }
+}
+
+######################################## COMPUTE INSTANCE GROUP MANAGER ########################################
+
+resource "google_compute_region_instance_group_manager" "appserver" {
+  name                      = "appserver-igm"
+  count                     = var.vpc_count
+  base_instance_name        = "webapp"
+  region                    = var.region
+  distribution_policy_zones = ["us-central1-a", "us-central1-f"]
+  # distribution_policy_target_shape = "BALANCED"
+  version {
+    instance_template = google_compute_region_instance_template.vm_template[count.index].self_link
+  }
+
+  named_port {
+    name = "http"
+    port = 8000
+  }
+
+  auto_healing_policies {
+    health_check      = google_compute_health_check.http-health-check.id
+    initial_delay_sec = 300
+  }
+}
+
+# #############################################  SSL CERTIFICATE #############################################
+
+resource "google_compute_managed_ssl_certificate" "lb_default" {
+  name = "myservice-ssl-cert"
+  managed {
+    domains = ["sjaiswal.me"]
+  }
+}
+
+######################################## LOAD BALANCER ########################################
+
+# backend subnet
+resource "google_compute_subnetwork" "default" {
+  count         = var.vpc_count
+  name          = "backend-subnet"
+  ip_cidr_range = "10.1.2.0/24"
+  region        = var.region
+  # purpose       = "PRIVATE"
+  network = google_compute_network.vpcnetwork[count.index].id
+  # stack_type    = "IPV4_ONLY"
+  private_ip_google_access = true
+}
+# reserved IP address
+resource "google_compute_global_address" "default" {
+  # provider = google-beta
+  name = "static-address"
+}
+
+# forwarding rule
+resource "google_compute_global_forwarding_rule" "default" {
+  count = var.vpc_count
+  name  = "l7-xlb-forwarding-rule"
+  # provider              = google-beta
+  ip_protocol           = "TCP"
+  load_balancing_scheme = "EXTERNAL_MANAGED"
+  port_range            = "443"
+  target                = google_compute_target_https_proxy.lb_default[count.index].id
+  ip_address            = google_compute_global_address.default.id
+}
+
+
+# http proxy
+resource "google_compute_target_https_proxy" "lb_default" {
+  count = var.vpc_count
+  # provider = google-beta
+  name    = "myservice-https-proxy"
+  url_map = google_compute_url_map.default[count.index].id
+  ssl_certificates = [
+    google_compute_managed_ssl_certificate.lb_default.name
+  ]
+  depends_on = [
+    google_compute_managed_ssl_certificate.lb_default
+  ]
+}
+
+# url map
+resource "google_compute_url_map" "default" {
+  count           = var.vpc_count
+  name            = "url-map-regional"
+  default_service = google_compute_backend_service.default[count.index].id
+}
+
+# backend service with custom request and response headers
+resource "google_compute_backend_service" "default" {
+  count                 = var.vpc_count
+  name                  = "backend-service"
+  load_balancing_scheme = "EXTERNAL_MANAGED"
+  locality_lb_policy    = "ROUND_ROBIN"
+  health_checks         = [google_compute_health_check.http-health-check.id]
+  protocol              = "HTTP"
+  session_affinity      = "NONE"
+  timeout_sec           = 30
+  backend {
+    group           = google_compute_region_instance_group_manager.appserver[count.index].instance_group
+    balancing_mode  = "UTILIZATION"
+    capacity_scaler = 1.0
+  }
+  log_config {
+    enable = true
+  }
+}
+# # ############################################## GOOGLE DNS RECORD SET #############################################
 
 # Update Cloud DNS zone using Terraform to add or update A records
 
 resource "google_dns_record_set" "csye6225" {
   count        = var.vpc_count
   name         = "sjaiswal.me."
-  type        = "A"
-  ttl         = 21600
+  type         = "A"
+  ttl          = 21600
   managed_zone = "csye-zone"
-  rrdatas     = [google_compute_instance.my_instance[count.index].network_interface[0].access_config[0].nat_ip]
-  depends_on = [google_compute_instance.my_instance]
+  rrdatas      = [google_compute_global_address.default.address]
+  depends_on   = [google_compute_backend_service.default]
 }
 
-############################################## PUB/SUB - TOPIC #############################################
+# ############################################## PUB/SUB - TOPIC #############################################
 
 resource "google_pubsub_topic" "verify_email" {
   name = var.pubsub_topic
@@ -268,10 +401,10 @@ resource "google_pubsub_topic" "verify_email" {
 
 resource "google_pubsub_topic_iam_binding" "binding" {
   project = var.project_id
-  topic = google_pubsub_topic.verify_email.name
-  role  = var.pubsub_publisher
+  topic   = google_pubsub_topic.verify_email.name
+  role    = var.pubsub_publisher
   members = [
-    "serviceAccount:${google_service_account.vm_service_account.email}",
+    "serviceAccount:${google_service_account.service_account.email}",
   ]
 }
 
@@ -295,23 +428,23 @@ resource "google_storage_bucket" "bucket" {
 ########################################### VPC CONNECT #############################################
 
 resource "google_vpc_access_connector" "connector" {
-  count        = var.vpc_count
+  count         = var.vpc_count
   name          = "connector"
   ip_cidr_range = "10.8.0.0/28"
-  network     = google_compute_network.vpcnetwork[count.index].self_link
+  network       = google_compute_network.vpcnetwork[count.index].self_link
 }
 
 
 ########################################## CLOUD FUNCTION VARIABLES ###################################
 
 resource "google_cloudfunctions2_function" "function" {
-  count = var.vpc_count
-  name = var.cloud_function_name
-  location = var.region
+  count       = var.vpc_count
+  name        = var.cloud_function_name
+  location    = var.region
   description = "a new function"
 
   build_config {
-    runtime = var.cloud_runtime
+    runtime     = var.cloud_runtime
     entry_point = var.cloud_entry_point # Set the entry point 
     source {
       storage_source {
@@ -320,34 +453,40 @@ resource "google_cloudfunctions2_function" "function" {
       }
     }
     environment_variables = {
-    DB_USERNAME=google_sql_user.cloudsql_user[count.index].name,
-    DB_PASSWORD=google_sql_user.cloudsql_user[count.index].password,
-    DB_HOST=google_sql_database_instance.cloudsql_instance[count.index].private_ip_address,
-    DB_NAME=google_sql_database.cloudsql_database[count.index].name,
-    MAILGUN_API_KEY=var.MAILGUN_API_KEY,
-    DB_PORT = var.postgres_port
+      SERVICE_BUILD_TEST = "build_test"
+      # DB_USERNAME=google_sql_user.cloudsql_user[count.index].name,
+      # DB_PASSWORD=google_sql_user.cloudsql_user[count.index].password,
+      # DB_HOST=google_sql_database_instance.cloudsql_instance[count.index].private_ip_address,
+      # DB_NAME=google_sql_database.cloudsql_database[count.index].name,
+      # MAILGUN_API_KEY=var.MAILGUN_API_KEY,
+      # DB_PORT = var.postgres_port
     }
   }
 
   service_config {
-    max_instance_count  = 3
+    max_instance_count = 3
     min_instance_count = 1
-    available_memory    = "256M"
-    timeout_seconds     = 60
+    available_memory   = "256M"
+    timeout_seconds    = 60
     environment_variables = {
-      SERVICE_CONFIG_TEST = "config_test"
+      DB_USERNAME     = google_sql_user.cloudsql_user[count.index].name,
+      DB_PASSWORD     = google_sql_user.cloudsql_user[count.index].password,
+      DB_HOST         = google_sql_database_instance.cloudsql_instance[count.index].private_ip_address,
+      DB_NAME         = google_sql_database.cloudsql_database[count.index].name,
+      MAILGUN_API_KEY = var.MAILGUN_API_KEY,
+      DB_PORT         = var.postgres_port
     }
-    ingress_settings = "ALLOW_INTERNAL_ONLY"
-    vpc_connector = "projects/dev-gcp-project-414615/locations/us-west1/connectors/connector" 
+    ingress_settings               = "ALLOW_INTERNAL_ONLY"
+    vpc_connector                  = "projects/dev-gcp-project-414615/locations/${var.region}/connectors/connector"
     all_traffic_on_latest_revision = true
-    service_account_email = google_service_account.vm_service_account.email
+    service_account_email          = google_service_account.service_account.email
   }
 
   event_trigger {
     trigger_region = var.region
-    event_type = var.cloud_event_type
-    pubsub_topic = google_pubsub_topic.verify_email.id
-    retry_policy = var.cloud_retry_policy
+    event_type     = var.cloud_event_type
+    pubsub_topic   = google_pubsub_topic.verify_email.id
+    retry_policy   = var.cloud_retry_policy
   }
-  depends_on   = [google_vpc_access_connector.connector]
+  depends_on = [google_vpc_access_connector.connector]
 }

@@ -20,31 +20,37 @@ variable "vpc_names" {
 variable "region" {
   type        = string
   description = "GCP Region for this infrastructure"
-  default     = "us-west1"
+  default     = "us-central1"
+}
+
+variable "zone" {
+  type        = string
+  description = "GCP Zone for Compute Engine instance"
+  default     = "us-central1-a"
 }
 
 variable "subnet_webapp_name" {
   type        = list(string)
   description = "A list of names for the webapp subnets"
-  default = ["webapp1","webapp2"]
+  default     = ["webapp1", "webapp2"]
 }
 
 variable "subnet_CIDR_webapp" {
   type        = list(string)
   description = "CIDR ranges of webapp subnets"
-  default  = ["10.10.10.0/24", "10.10.20.0/24"]
+  default     = ["10.10.10.0/24", "10.10.20.0/24"]
 }
 
 variable "subnet_db_name" {
   type        = list(string)
   description = "A list of names for the db subnets"
-  default = ["db1","db2"]
+  default     = ["db1", "db2"]
 }
 
 variable "subnet_CIDR_db" {
   type        = list(string)
   description = "CIDR ranges of database subnets"
-  default  = ["10.10.30.0/24", "10.10.40.0/24"]
+  default     = ["10.10.30.0/24", "10.10.40.0/24"]
 }
 
 variable "webapp_route" {
@@ -62,25 +68,19 @@ variable "my_instance_name" {
 variable "machine_type" {
   type        = string
   description = "Machine type for Compute Engine instance"
-  default     = "n1-standard-1"
-}
-
-variable "zone" {
-  type        = string
-  description = "GCP Zone for Compute Engine instance"
-  default     = "us-west1-b"
+  default     = "n1-standard-2"
 }
 
 variable "packer_image" {
   type        = string
   description = "Custom image name for boot disk"
-  default     = "centos-8-packer-20240327092458" #centos-8-packer-20240327021420 
+  default     = "centos-8-packer-20240403070957" #centos-8-packer-20240330050726
 }
 
 variable "initialize_params_size" {
   type        = number
   description = "Boot disk size in GB"
-  default     = 100
+  default     = 30
 }
 
 variable "initialize_params_type" {
@@ -220,7 +220,7 @@ variable "database_version" {
 variable "tier" {
   description = "Tier for Cloud SQL instances"
   type        = string
-  default     = "db-f1-micro"
+  default     = "db-f1-micro" #"db-custom-2-7680" #"db-f1-micro" #
 }
 
 
@@ -243,6 +243,7 @@ variable "managed_zone_name" {
   description = "Name of the managed DNS zone"
   default     = "csye-zone"
 }
+
 
 # Variable for the DNS name associated with the managed zone
 variable "dns_name" {
@@ -269,24 +270,24 @@ variable "record_set_ttl" {
 variable "compute_instance_ip" {
   type        = string
   description = "IP address of the Google Compute Engine instance"
-  default     = "10.0.0.1"  # Update with the actual IP address
+  default     = "10.0.0.1" # Update with the actual IP address
 }
 
 ########################### PUB/SUB Variables ##############################
 
-variable "pubsub_topic"{
+variable "pubsub_topic" {
   description = "pubsub topic"
   type        = string
   default     = "verify_email"
 }
 
-variable "retention_time"{
+variable "retention_time" {
   description = "retention_time"
   type        = string
   default     = "604800s"
 }
 
-variable "pubsub_publisher"{
+variable "pubsub_publisher" {
   description = "pubsub.publisher"
   type        = string
   default     = "roles/pubsub.publisher"
@@ -300,25 +301,25 @@ variable "cloud_platform_scope" {
   default     = "cloud-platform"
 }
 
-variable "bucket_location"{
+variable "bucket_location" {
   description = "pubsub location"
   type        = string
   default     = "US"
 }
 
-variable "archive_output_path"{
+variable "archive_output_path" {
   description = "archive_file"
   type        = string
   default     = "/tmp/serverless-fork.zip"
 }
 
-variable "archive_source_file"{
+variable "archive_source_file" {
   description = "archive_file"
   type        = string
-  default     = "/Users/shreyajaiswal/Downloads/serverless-fork" 
+  default     = "/Users/shreyajaiswal/Downloads/serverless-fork"
 }
 
-variable "archive_file_name"{
+variable "archive_file_name" {
   description = "archive_file"
   type        = string
   default     = "serverless-fork.zip"
@@ -346,7 +347,7 @@ variable "cloud_entry_point" {
 variable "cloud_event_type" {
   description = "Event type for the Cloud Function trigger"
   type        = string
-  default     = "google.cloud.pubsub.topic.v1.messagePublished" 
+  default     = "google.cloud.pubsub.topic.v1.messagePublished"
 }
 
 variable "cloud_retry_policy" {
@@ -361,20 +362,20 @@ variable "cloud_retry_policy" {
 #   default     = "256M"
 # }
 
-variable "cloud_function_timeout"{
+variable "cloud_function_timeout" {
   description = "cloud_function_timeout"
   type        = number
   default     = 60
 }
 
-variable "cloud_function_object"{
+variable "cloud_function_object" {
   description = "cloud_function_object"
   type        = string
   default     = "function-source.zip"
 }
 
 
-variable "cloud_function_role"{
+variable "cloud_function_role" {
   description = "cloud_function_role"
   type        = string
   default     = "roles/viewer"
@@ -382,7 +383,7 @@ variable "cloud_function_role"{
 
 
 ########################### ENV Variables ##############################
-variable "MAILGUN_API_KEY"{
+variable "MAILGUN_API_KEY" {
   description = "mailgun-api-key"
   type        = string
   default     = "4de658fabd37ad41a0cc1666f49e8e51-f68a26c9-ab63ee66"
@@ -394,3 +395,63 @@ variable "connector_name" {
   default     = "vpc_conn"
 }
 
+variable "deny_priority" {
+  description = "Priority for the deny-all-traffic firewall rule"
+  type        = number
+  default     = 1200
+}
+
+variable "deny_protocol" {
+  description = "deny_protocol"
+  type        = string
+  default     = "all"
+}
+
+variable "private_ip_address_purpose" {
+  description = "Purpose of the private IP address"
+  type        = string
+  default     = "VPC_PEERING"
+}
+
+variable "private_ip_address_type" {
+  description = "Type of the private IP address"
+  type        = string
+  default     = "INTERNAL"
+}
+
+variable "private_ip_address_prefix_length" {
+  description = "Prefix length of the private IP address"
+  type        = number
+  default     = 16
+}
+
+variable "service_name" {
+  description = "Name of the service"
+  type        = string
+  default     = "servicenetworking.googleapis.com"
+}
+
+variable "auto_create_subnetworks" {
+  description = "auto_create_subnetworks"
+  type        = bool
+  default     = false
+}
+
+variable "allow_protocol" {
+  description = "allow protocol"
+  type        = string
+  default     = "tcp"
+}
+
+variable "allowed_ports" {
+  description = "List of allowed ports"
+  type        = list(string)
+  default     = ["80", "8000"]
+}
+
+
+variable "allow_priority" {
+  description = "Priority for the deny-all-traffic firewall rule"
+  type        = number
+  default     = 1000
+}
