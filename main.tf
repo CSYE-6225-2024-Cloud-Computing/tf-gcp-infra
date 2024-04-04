@@ -83,7 +83,10 @@ resource "google_compute_route" "webapp_route" {
   priority         = 1000
 }
 
+
 # ############################################# GOOGLE SQL DATABASE INSTANCE #############################################
+
+
 
 resource "google_sql_database_instance" "cloudsql_instance" {
   depends_on          = [google_service_networking_connection.private_vpc_connection]
@@ -128,11 +131,13 @@ resource "google_sql_user" "cloudsql_user" {
 }
 
 
+
 # #############################################  SERVICE ACCOUNT  #############################################
 
 resource "google_service_account" "service_account" {
   account_id   = "jais-service-account"
   display_name = "jaiswal-service-account"
+
 }
 
 
@@ -153,6 +158,7 @@ resource "google_project_iam_binding" "Logging_Admin" {
     "serviceAccount:${google_service_account.service_account.email}",
   ]
 }
+
 
 # #############################################  COMPUTE REGION INSTANCE TEMPLATE #############################################
 
@@ -182,6 +188,7 @@ resource "google_compute_region_instance_template" "vm_template" {
       network_tier = "STANDARD"
     }
   }
+
 
   metadata_startup_script = <<-EOF
     #!/bin/bash
@@ -287,11 +294,14 @@ resource "google_compute_region_instance_group_manager" "appserver" {
     port = 8000
   }
 
+
   auto_healing_policies {
     health_check      = google_compute_health_check.http-health-check.id
     initial_delay_sec = 300
+
   }
 }
+
 
 # #############################################  SSL CERTIFICATE #############################################
 
@@ -346,6 +356,7 @@ resource "google_compute_target_https_proxy" "lb_default" {
   depends_on = [
     google_compute_managed_ssl_certificate.lb_default
   ]
+
 }
 
 # url map
@@ -354,6 +365,7 @@ resource "google_compute_url_map" "default" {
   name            = "url-map-regional"
   default_service = google_compute_backend_service.default[count.index].id
 }
+
 
 # backend service with custom request and response headers
 resource "google_compute_backend_service" "default" {
@@ -375,6 +387,7 @@ resource "google_compute_backend_service" "default" {
   }
 }
 # # ############################################## GOOGLE DNS RECORD SET #############################################
+
 
 # Update Cloud DNS zone using Terraform to add or update A records
 
@@ -399,12 +412,14 @@ resource "google_pubsub_topic" "verify_email" {
   message_retention_duration = var.retention_time
 }
 
+
 resource "google_pubsub_topic_iam_binding" "binding" {
   project = var.project_id
   topic   = google_pubsub_topic.verify_email.name
   role    = var.pubsub_publisher
   members = [
     "serviceAccount:${google_service_account.service_account.email}",
+
   ]
 }
 
@@ -428,16 +443,19 @@ resource "google_storage_bucket" "bucket" {
 ########################################### VPC CONNECT #############################################
 
 resource "google_vpc_access_connector" "connector" {
+
   count         = var.vpc_count
   name          = "connector"
   ip_cidr_range = "10.8.0.0/28"
   network       = google_compute_network.vpcnetwork[count.index].self_link
+
 }
 
 
 ########################################## CLOUD FUNCTION VARIABLES ###################################
 
 resource "google_cloudfunctions2_function" "function" {
+
   count       = var.vpc_count
   name        = var.cloud_function_name
   location    = var.region
@@ -445,6 +463,7 @@ resource "google_cloudfunctions2_function" "function" {
 
   build_config {
     runtime     = var.cloud_runtime
+
     entry_point = var.cloud_entry_point # Set the entry point 
     source {
       storage_source {
@@ -453,6 +472,7 @@ resource "google_cloudfunctions2_function" "function" {
       }
     }
     environment_variables = {
+
       SERVICE_BUILD_TEST = "build_test"
       # DB_USERNAME=google_sql_user.cloudsql_user[count.index].name,
       # DB_PASSWORD=google_sql_user.cloudsql_user[count.index].password,
@@ -460,10 +480,12 @@ resource "google_cloudfunctions2_function" "function" {
       # DB_NAME=google_sql_database.cloudsql_database[count.index].name,
       # MAILGUN_API_KEY=var.MAILGUN_API_KEY,
       # DB_PORT = var.postgres_port
+
     }
   }
 
   service_config {
+
     max_instance_count = 3
     min_instance_count = 1
     available_memory   = "256M"
@@ -480,13 +502,16 @@ resource "google_cloudfunctions2_function" "function" {
     vpc_connector                  = "projects/dev-gcp-project-414615/locations/${var.region}/connectors/connector"
     all_traffic_on_latest_revision = true
     service_account_email          = google_service_account.service_account.email
+
   }
 
   event_trigger {
     trigger_region = var.region
+
     event_type     = var.cloud_event_type
     pubsub_topic   = google_pubsub_topic.verify_email.id
     retry_policy   = var.cloud_retry_policy
   }
   depends_on = [google_vpc_access_connector.connector]
+
 }

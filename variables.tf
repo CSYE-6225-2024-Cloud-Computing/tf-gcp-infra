@@ -74,7 +74,9 @@ variable "machine_type" {
 variable "packer_image" {
   type        = string
   description = "Custom image name for boot disk"
+
   default     = "centos-8-packer-20240403070957" #centos-8-packer-20240330050726
+
 }
 
 variable "initialize_params_size" {
@@ -430,6 +432,7 @@ variable "service_name" {
   type        = string
   default     = "servicenetworking.googleapis.com"
 }
+
 
 variable "auto_create_subnetworks" {
   description = "auto_create_subnetworks"
