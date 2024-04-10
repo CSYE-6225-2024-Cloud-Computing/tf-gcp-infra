@@ -1,3 +1,4 @@
+
 ########################################## Create Key Ring to store Customer-Managed Encryption Keys (CMEK) ###################################
 resource "google_kms_key_ring" "key_ring" {
   name     = "my-key-ring-v7"
@@ -61,7 +62,9 @@ resource "google_compute_firewall" "deny_all_traffic" {
   count       = var.vpc_count
   name        = "deny-all-traffic-${count.index}"
   network     = google_compute_network.vpcnetwork[count.index].self_link
+
   target_tags = ["webapp", "web-servers"]
+
 
   deny {
     protocol = var.deny_protocol
@@ -80,7 +83,9 @@ resource "google_compute_subnetwork" "webapp" {
   ip_cidr_range = var.subnet_CIDR_webapp[count.index]
   region        = var.region
   network       = google_compute_network.vpcnetwork[count.index].id
+
   private_ip_google_access = true
+
 }
 # ############################################# GLOBAL ADDRESS AND NETWORKING  CONNECTION ########################
 
@@ -110,6 +115,7 @@ resource "google_compute_route" "webapp_route" {
   next_hop_gateway = var.webapp_route_next_hop_gateway
   priority         = 1000
 }
+
 
 # #############################################  SERVICE ACCOUNT  #############################################
 
@@ -158,6 +164,7 @@ resource "google_kms_crypto_key_iam_binding" "crypto_key-sql" {
 data "google_storage_project_service_account" "gcs_account" {
 }
 
+
 resource "google_kms_crypto_key_iam_binding" "storage-binding" {
   crypto_key_id = google_kms_crypto_key.storage_crypt_key.id
   role          = "roles/cloudkms.cryptoKeyEncrypterDecrypter"
@@ -180,17 +187,22 @@ resource "google_kms_crypto_key_iam_binding" "vm-instance-binding" {
 
 resource "google_sql_database_instance" "cloudsql_instance" {
   depends_on          = [google_service_networking_connection.private_vpc_connection, google_kms_crypto_key_iam_binding.crypto_key-sql]
+
   count               = var.vpc_count
   name                = var.database_instance_name
   database_version    = var.database_version
+
   deletion_protection = var.database_deletion_protection
+
   region              = var.region
   settings {
     tier              = var.database_tier
     availability_type = var.routing_mode
+
     disk_type         = var.database_disk_type
     disk_size         = var.databse_disk_size
     disk_autoresize   = var.database_disk_autoresize
+
     ip_configuration {
       ipv4_enabled    = var.database_ipv4_enabled
       private_network = google_compute_network.vpcnetwork[count.index].id
@@ -221,6 +233,7 @@ resource "google_sql_user" "cloudsql_user" {
   instance = google_sql_database_instance.cloudsql_instance[count.index].name
   password = random_password.password.result #var.db_password
 }
+
 
 
 # #############################################  COMPUTE REGION INSTANCE TEMPLATE #############################################
@@ -304,7 +317,7 @@ resource "google_compute_health_check" "http-health-check" {
     enable = var.health_check_enable_log
   }
 
-}
+
 
 ################################## HEALTH CHECK FIREWALL ##################################
 resource "google_compute_firewall" "health-check" {
@@ -321,6 +334,7 @@ resource "google_compute_firewall" "health-check" {
   target_tags   = ["web-servers"]
 }
 ######################################## REGION AUTOSCALAR ########################################
+
 
 resource "google_compute_region_autoscaler" "autoscaler" {
   count  = var.vpc_count
@@ -400,7 +414,84 @@ resource "google_compute_global_forwarding_rule" "default" {
   port_range            = var.load_balancing_port_range
   target                = google_compute_target_https_proxy.lb_default[count.index].id
   ip_address            = google_compute_global_address.default.id
+
 }
+
+######################################## LOAD BALANCER ########################################
+
+# backend subnet
+resource "google_compute_subnetwork" "default" {
+  count         = var.vpc_count
+  name          = "backend-subnet"
+  ip_cidr_range = "10.1.2.0/24"
+  region        = var.region
+  # purpose       = "PRIVATE"
+  network = google_compute_network.vpcnetwork[count.index].id
+  # stack_type    = "IPV4_ONLY"
+  private_ip_google_access = true
+}
+# reserved IP address
+resource "google_compute_global_address" "default" {
+  # provider = google-beta
+  name = "static-address"
+}
+
+# forwarding rule
+resource "google_compute_global_forwarding_rule" "default" {
+  count = var.vpc_count
+  name  = "l7-xlb-forwarding-rule"
+  # provider              = google-beta
+  ip_protocol           = "TCP"
+  load_balancing_scheme = "EXTERNAL_MANAGED"
+  port_range            = "443"
+  target                = google_compute_target_https_proxy.lb_default[count.index].id
+  ip_address            = google_compute_global_address.default.id
+}
+
+
+# http proxy
+resource "google_compute_target_https_proxy" "lb_default" {
+  count = var.vpc_count
+  # provider = google-beta
+  name    = "myservice-https-proxy"
+  url_map = google_compute_url_map.default[count.index].id
+  ssl_certificates = [
+    google_compute_managed_ssl_certificate.lb_default.name
+  ]
+  depends_on = [
+    google_compute_managed_ssl_certificate.lb_default
+  ]
+
+}
+
+# url map
+resource "google_compute_url_map" "default" {
+  count           = var.vpc_count
+  name            = "url-map-regional"
+  default_service = google_compute_backend_service.default[count.index].id
+}
+
+
+# backend service with custom request and response headers
+resource "google_compute_backend_service" "default" {
+  count                 = var.vpc_count
+  name                  = "backend-service"
+  load_balancing_scheme = "EXTERNAL_MANAGED"
+  locality_lb_policy    = "ROUND_ROBIN"
+  health_checks         = [google_compute_health_check.http-health-check.id]
+  protocol              = "HTTP"
+  session_affinity      = "NONE"
+  timeout_sec           = 30
+  backend {
+    group           = google_compute_region_instance_group_manager.appserver[count.index].instance_group
+    balancing_mode  = "UTILIZATION"
+    capacity_scaler = 1.0
+  }
+  log_config {
+    enable = true
+  }
+}
+# # ############################################## GOOGLE DNS RECORD SET #############################################
 
 
 # http proxy
@@ -443,12 +534,12 @@ resource "google_compute_backend_service" "default" {
     enable = true
   }
 }
-# # ############################################## GOOGLE DNS RECORD SET #############################################
 
 # Update Cloud DNS zone using Terraform to add or update A records
 
 resource "google_dns_record_set" "csye6225" {
   count        = var.vpc_count
+
   name         = var.dns_record_set_name
   type         = var.dns_record_set_type
   ttl          = var.dns_record_set_ttl
@@ -518,6 +609,8 @@ resource "google_vpc_access_connector" "connector" {
 ########################################## CLOUD FUNCTION VARIABLES ###################################
 
 resource "google_cloudfunctions2_function" "function" {
+
+
   count       = var.vpc_count
   name        = var.cloud_function_name
   location    = var.region
@@ -525,6 +618,7 @@ resource "google_cloudfunctions2_function" "function" {
 
   build_config {
     runtime     = var.cloud_runtime
+
     entry_point = var.cloud_entry_point # Set the entry point 
     source {
       storage_source {
@@ -533,6 +627,7 @@ resource "google_cloudfunctions2_function" "function" {
       }
     }
     environment_variables = {
+
       SERVICE_BUILD_TEST = "build_test"
       # DB_USERNAME=google_sql_user.cloudsql_user[count.index].name,
       # DB_PASSWORD=google_sql_user.cloudsql_user[count.index].password,
@@ -540,14 +635,17 @@ resource "google_cloudfunctions2_function" "function" {
       # DB_NAME=google_sql_database.cloudsql_database[count.index].name,
       # MAILGUN_API_KEY=var.MAILGUN_API_KEY,
       # DB_PORT = var.postgres_port
+
     }
   }
 
   service_config {
+
     max_instance_count = var.service_config_max_instance_count
     min_instance_count = var.service_config_min_instance_count
     available_memory   = "256M"
     timeout_seconds    = var.service_config_timeout_seconds
+
     environment_variables = {
       DB_USERNAME     = google_sql_user.cloudsql_user[count.index].name,
       DB_PASSWORD     = google_sql_user.cloudsql_user[count.index].password,
@@ -556,19 +654,29 @@ resource "google_cloudfunctions2_function" "function" {
       MAILGUN_API_KEY = var.MAILGUN_API_KEY,
       DB_PORT         = var.postgres_port
     }
+
     ingress_settings               = var.service_config_ingress_settings
     vpc_connector                  = "projects/dev-gcp-project-414615/locations/${var.region}/connectors/connector"
     all_traffic_on_latest_revision = true
     service_account_email          = google_service_account.service_account.email
+
+    ingress_settings               = "ALLOW_INTERNAL_ONLY"
+    vpc_connector                  = "projects/dev-gcp-project-414615/locations/${var.region}/connectors/connector"
+    all_traffic_on_latest_revision = true
+    service_account_email          = google_service_account.service_account.email
+
+
   }
 
   event_trigger {
     trigger_region = var.region
+
     event_type     = var.cloud_event_type
     pubsub_topic   = google_pubsub_topic.verify_email.id
     retry_policy   = var.cloud_retry_policy
   }
   depends_on = [google_vpc_access_connector.connector]
+
 }
 
 
@@ -581,4 +689,5 @@ resource "local_file" "output_file_data" {
     service_acc = google_service_account.service_account.email
   })
   filename = "outputs.json"
+
 }
