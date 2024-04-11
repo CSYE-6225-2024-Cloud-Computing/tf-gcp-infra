@@ -1,9 +1,23 @@
+######################################## PROJECT VARIABLES ##########################################
 variable "project_id" {
   type        = string
   description = "Google Cloud Project ID"
   default     = "dev-gcp-project-414615"
 }
 
+variable "region" {
+  type        = string
+  description = "GCP Region for this infrastructure"
+  default     = "us-east4" #"us-central1"
+}
+
+variable "zone" {
+  type        = list(string)
+  description = "GCP Zone for Compute Engine instance"
+  default     = ["us-east4-c"] #"us-central1-a"
+}
+
+######################################## VPC VARIABLES #############################################
 variable "vpc_count" {
   type        = number
   description = "Number of VPCs to create"
@@ -16,19 +30,51 @@ variable "vpc_names" {
   default     = ["vpc-1", "vpc-2"]
 }
 
-
-variable "region" {
-  type        = string
-  description = "GCP Region for this infrastructure"
-  default     = "us-central1"
+variable "auto_create_subnetworks" {
+  description = "auto_create_subnetworks"
+  type        = bool
+  default     = false
 }
 
-variable "zone" {
+variable "routing_mode" {
   type        = string
-  description = "GCP Zone for Compute Engine instance"
-  default     = "us-central1-a"
+  description = "Routing Mode"
+  default     = "REGIONAL"
 }
 
+######################################## FIREWALL VARIABLES #############################################
+variable "allow_protocol" {
+  description = "allow protocol"
+  type        = string
+  default     = "tcp"
+}
+
+variable "allowed_ports" {
+  description = "List of allowed ports"
+  type        = list(string)
+  default     = ["80", "8000"]
+}
+
+
+variable "allow_priority" {
+  description = "Priority for the deny-all-traffic firewall rule"
+  type        = number
+  default     = 1000
+}
+
+variable "deny_priority" {
+  description = "Priority for the deny-all-traffic firewall rule"
+  type        = number
+  default     = 1200
+}
+
+variable "deny_protocol" {
+  description = "deny_protocol"
+  type        = string
+  default     = "all"
+}
+
+######################################## SUBNET WEBAPP VARIABLES #############################################
 variable "subnet_webapp_name" {
   type        = list(string)
   description = "A list of names for the webapp subnets"
@@ -40,18 +86,33 @@ variable "subnet_CIDR_webapp" {
   description = "CIDR ranges of webapp subnets"
   default     = ["10.10.10.0/24", "10.10.20.0/24"]
 }
-
-variable "subnet_db_name" {
-  type        = list(string)
-  description = "A list of names for the db subnets"
-  default     = ["db1", "db2"]
+######################################## GLOBAL ADDRESS AND NETWORKING  CONNECTION #############################################
+variable "private_ip_address_purpose" {
+  description = "Purpose of the private IP address"
+  type        = string
+  default     = "VPC_PEERING"
 }
 
-variable "subnet_CIDR_db" {
-  type        = list(string)
-  description = "CIDR ranges of database subnets"
-  default     = ["10.10.30.0/24", "10.10.40.0/24"]
+variable "private_ip_address_type" {
+  description = "Type of the private IP address"
+  type        = string
+  default     = "INTERNAL"
 }
+
+variable "private_ip_address_prefix_length" {
+  description = "Prefix length of the private IP address"
+  type        = number
+  default     = 16
+}
+
+
+variable "service_name" {
+  description = "Name of the service"
+  type        = string
+  default     = "servicenetworking.googleapis.com"
+}
+
+# ############################################# WEBAPP ROUTE VARIABLES ############################################
 
 variable "webapp_route" {
   type        = string
@@ -59,155 +120,31 @@ variable "webapp_route" {
   default     = "webapp-route"
 }
 
-variable "my_instance_name" {
+variable "webapp_route_dest_range" {
+  description = "webapp_route_dest_range"
   type        = string
-  description = "Name of the Compute Engine instance"
-  default     = "my-instance"
+  default     = "0.0.0.0/0"
 }
 
-variable "machine_type" {
+variable "webapp_route_next_hop_gateway" {
+  description = "webapp_route_next_hop_gateway"
   type        = string
-  description = "Machine type for Compute Engine instance"
-  default     = "n1-standard-2"
+  default     = "global/gateways/default-internet-gateway"
 }
 
-variable "packer_image" {
-  type        = string
-  description = "Custom image name for boot disk"
-
-  default     = "centos-8-packer-20240403070957" #centos-8-packer-20240330050726
-
+# #############################################  SERVICE ACCOUNT VARIABLES #############################################
+variable "metric_writer_role" {
+  description = "The role assigned to the service account for metric writing."
+  default     = "roles/monitoring.metricWriter"
 }
 
-variable "initialize_params_size" {
-  type        = number
-  description = "Boot disk size in GB"
-  default     = 30
+variable "logging_admin_role" {
+  description = "The role assigned to the service account for logging administration."
+  default     = "roles/logging.admin"
 }
 
-variable "initialize_params_type" {
-  type        = string
-  description = "Boot disk type"
-  default     = "pd-balanced"
-}
-
-variable "server_port" {
-  type        = number
-  description = "Application server port"
-  default     = 8000
-}
-
-variable "script_path" {
-  type        = string
-  description = "Path to startup.sh script"
-  default     = "./startup.sh"
-}
-
-variable "postgres_db" {
-  type        = string
-  description = "PostgreSQL database name"
-  default     = "test01"
-}
-
-variable "postgres_user" {
-  type        = string
-  description = "PostgreSQL database username"
-  default     = "postgres"
-}
-
-variable "postgres_password" {
-  type        = string
-  description = "PostgreSQL database password"
-  default     = "postgres"
-}
-
-variable "postgres_uri" {
-  type        = string
-  description = "PostgreSQL database URI"
-  default     = "localhost"
-}
-
-variable "postgres_port" {
-  type        = number
-  description = "PostgreSQL database port"
-  default     = 5432
-}
-
-variable "app_user" {
-  type        = string
-  description = "Application user"
-  default     = "csye6225"
-}
-
-variable "app_password" {
-  type        = string
-  description = "Application password"
-  default     = "csye6225"
-}
-
-variable "app_group" {
-  type        = string
-  description = "Application group"
-  default     = "csye6225"
-}
-
-variable "app_dir" {
-  type        = string
-  description = "Application directory"
-  default     = "/var/www/webapp"
-}
-
-variable "env_dir" {
-  type        = string
-  description = "Environment directory"
-  default     = "/home/csye6225/webapp/.env"
-}
-
-variable "routing_mode" {
-  type        = string
-  description = "Routing Mode"
-  default     = "REGIONAL"
-}
-
-variable "db_password" {
-  type        = string
-  description = "Custom image name for boot disk"
-  default     = "test1234"
-}
-
-
-variable "deletion_protection" {
-  description = "Enable or disable deletion protection for Cloud SQL instances"
-  type        = bool
-  default     = false
-}
-
-variable "disk_type" {
-  description = "Disk type for Cloud SQL instances"
-  type        = string
-  default     = "pd-ssd"
-}
-
-variable "disk_size" {
-  description = "Disk size for Cloud SQL instances"
-  type        = number
-  default     = 100
-}
-
-variable "disk_autoresize" {
-  description = "Enable or disable automatic disk resizing for Cloud SQL instances"
-  type        = bool
-  default     = true
-}
-
-
-variable "ipv4_enabled" {
-  description = "Enable or disable IPv4 for Cloud SQL instances"
-  type        = bool
-  default     = false
-}
-
-variable "instance_name" {
+# ############################################# GOOGLE SQL DATABASE INSTANCE VARIABLES###################################
+variable "database_instance_name" {
   description = "Name of the Cloud SQL instance"
   type        = string
   default     = "csye6225-cloudsql-instance"
@@ -219,12 +156,42 @@ variable "database_version" {
   default     = "POSTGRES_15"
 }
 
-variable "tier" {
+variable "database_deletion_protection" {
+  description = "Enable or disable deletion protection for Cloud SQL instances"
+  type        = bool
+  default     = false
+}
+
+variable "database_tier" {
   description = "Tier for Cloud SQL instances"
   type        = string
   default     = "db-f1-micro" #"db-custom-2-7680" #"db-f1-micro" #
 }
 
+
+variable "database_disk_type" {
+  description = "Disk type for Cloud SQL instances"
+  type        = string
+  default     = "pd-ssd"
+}
+
+variable "databse_disk_size" {
+  description = "Disk size for Cloud SQL instances"
+  type        = number
+  default     = 100
+}
+
+variable "database_disk_autoresize" {
+  description = "Enable or disable automatic disk resizing for Cloud SQL instances"
+  type        = bool
+  default     = true
+}
+
+variable "database_ipv4_enabled" {
+  description = "Enable or disable IPv4 for Cloud SQL instances"
+  type        = bool
+  default     = false
+}
 
 variable "cloudsql_database_name" {
   description = "Name of the database to be created in Cloud SQL"
@@ -238,45 +205,243 @@ variable "cloudsql_user_name" {
   default     = "webapp"
 }
 
-
-# Variable for the name of the managed DNS zone
-variable "managed_zone_name" {
+#######################################  COMPUTE REGION INSTANCE TEMPLATE  VARIABLES#############################################
+variable "vm_template_name" {
+  description = "Name of the VM template to be created"
   type        = string
-  description = "Name of the managed DNS zone"
+  default     = "webapp-template"
+}
+variable "machine_type" {
+  type        = string
+  description = "Machine type for Compute Engine instance"
+  default     = "n1-standard-2"
+}
+
+variable "wm_instance_boot_disk_size_gb" {
+  type        = number
+  description = "Boot disk size in GB"
+  default     = 30
+}
+
+variable "wm_instance_boot_disk_type" {
+  type        = string
+  description = "Boot disk type"
+  default     = "pd-balanced"
+}
+
+#metadata_startup_script_variables
+variable "postgres_port" {
+  type        = number
+  description = "PostgreSQL database port"
+  default     = 5432
+}
+
+variable "app_user" {
+  type        = string
+  description = "Application user"
+  default     = "csye6225"
+}
+
+
+variable "app_group" {
+  type        = string
+  description = "Application group"
+  default     = "csye6225"
+}
+
+variable "packer_image" {
+  type        = string
+  description = "Custom image name for boot disk"
+  default     = "centos-8-packer-20240403070957" #centos-8-packer-20240409033206
+}
+
+
+########################################### HEALTH CHECK VARIABLES ###########################################
+variable "health_check_timeout_seconds" {
+  type        = number
+  description = "The amount of time, in seconds, for which the health check can wait to receive a response from the instance."
+  default     = 5
+}
+
+variable "health_check_check_interval_seconds" {
+  type        = number
+  description = "How often (in seconds) to send a health check request."
+  default     = 15
+}
+
+variable "health_check_healthy_threshold_count" {
+  description = "The number of consecutive health check successes required before moving the instance to the healthy state."
+  default     = 4
+}
+
+variable "health_check_unhealthy_threshold_count" {
+  type        = number
+  description = "The number of consecutive health check failures required before moving the instance to the unhealthy state."
+  default     = 4
+}
+
+variable "health_check_port" {
+  type        = number
+  description = "The TCP port number for the health check request."
+  default     = 8000
+}
+
+variable "health_check_port_specification" {
+  type        = string
+  description = "The port specification for the health check."
+  default     = "USE_FIXED_PORT"
+}
+
+variable "health_check_request_path" {
+  type        = string
+  description = "The HTTP request path to use for the health check."
+  default     = "/healthz/"
+}
+
+variable "health_check_enable_log" {
+  type        = bool
+  description = "Enable logging for the health check."
+  default     = true
+}
+
+################################## HEALTH CHECK FIREWALL VARIABLES##################################
+variable "health_check_firewall_allowed_ports" {
+  type        = list(string)
+  description = "List of ports to allow for health check."
+  default     = ["80", "443", "8000"]
+}
+
+variable "health_check_firewall_priority" {
+  type        = number
+  description = "Priority of the firewall rule."
+  default     = 1000
+}
+
+variable "health_check_firewall_source_ranges" {
+  type        = list(string)
+  description = "List of CIDR ranges to allow traffic from."
+  default     = ["130.211.0.0/22", "35.191.0.0/16"]
+}
+######################################## REGION AUTOSCALAR VARIABLES ########################################
+variable "autoscalar_max_replicas" {
+  type        = number
+  description = "Maximum number of replicas to scale to."
+  default     = 2
+}
+
+variable "autoscalar_min_replicas" {
+  type        = number
+  description = "Minimum number of replicas to maintain."
+  default     = 1
+}
+
+variable "autoscalar_cooldown_period" {
+  type        = number
+  description = "Cooldown period in seconds between scaling actions."
+  default     = 60
+}
+
+variable "autoscalar_cpu_utilization_target" {
+  type        = number
+  description = "Target CPU utilization for autoscaling."
+  default     = 0.05
+}
+####################################### COMPUTE INSTANCE GROUP MANAGER VARIABLES ########################################
+
+variable "instance_group_manager_port_name" {
+  type        = string
+  description = "Named port of the instance group manager."
+  default     = "http"
+}
+
+variable "instance_group_manager_port_number" {
+  type        = number
+  description = "port number of the instance group manager."
+  default     = 8000
+}
+######################################## LOAD BALANCER VARIABLES########################################
+# forwarding rule
+
+variable "ip_cidr_range" {
+  description = "ip_cidr_range"
+  type        = string
+  default     = "10.1.2.0/24"
+}
+
+variable "load_balancing_scheme" {
+  description = "Load balancing scheme for the forwarding rule"
+  type        = string
+  default     = "EXTERNAL_MANAGED"
+}
+
+variable "load_balancing_port_range" {
+  description = "Port range for the forwarding rule"
+  type        = string
+  default     = "443"
+}
+
+variable "ip_protocol" {
+  description = "allow protocol"
+  type        = string
+  default     = "TCP"
+}
+
+# backend service with custom request and response headers
+variable "locality_lb_policy" {
+  description = "Locality-based load balancing policy for the backend service"
+  type        = string
+  default     = "ROUND_ROBIN"
+}
+
+variable "backend_protocol" {
+  description = "Protocol for the backend service"
+  type        = string
+  default     = "HTTP"
+}
+
+variable "backend_session_affinity" {
+  description = "Session affinity for the backend service"
+  type        = string
+  default     = "NONE"
+}
+
+variable "backend_timeout_sec" {
+  description = "Timeout in seconds for the backend service"
+  type        = number
+  default     = 30
+}
+
+variable "backend_balancing_mode" {
+  description = "Balancing mode for the backend service"
+  type        = string
+  default     = "UTILIZATION"
+}
+
+############################################## GOOGLE DNS RECORD SET VARIABLES #############################################
+variable "dns_record_set_name" {
+  description = "Name of the DNS record set"
+  type        = string
+  default     = "sjaiswal.me."
+}
+variable "dns_record_set_type" {
+  description = "Type of the DNS record set"
+  type        = string
+  default     = "A"
+}
+
+variable "dns_record_set_ttl" {
+  description = "Time to live (TTL) for the DNS record set in seconds"
+  type        = number
+  default     = 21600
+}
+
+variable "dns_managed_zone" {
+  description = "Managed zone for the DNS record set"
+  type        = string
   default     = "csye-zone"
 }
 
-
-# Variable for the DNS name associated with the managed zone
-variable "dns_name" {
-  type        = string
-  description = "DNS name associated with the managed zone"
-  default     = "sjaiswal.me."
-}
-
-# Variable for the name of the DNS record set
-variable "record_set_name" {
-  type        = string
-  description = "Name of the DNS record set"
-  default     = "csye6225-zone"
-}
-
-# Variable for the TTL (Time To Live) for the DNS record set
-variable "record_set_ttl" {
-  type        = number
-  description = "TTL for the DNS record set"
-  default     = 300
-}
-
-# Variable for the IP address of the Google Compute Engine instance
-variable "compute_instance_ip" {
-  type        = string
-  description = "IP address of the Google Compute Engine instance"
-  default     = "10.0.0.1" # Update with the actual IP address
-}
-
-########################### PUB/SUB Variables ##############################
-
+############################################## PUB/SUB - TOPIC VARIABLES #############################################
 variable "pubsub_topic" {
   description = "pubsub topic"
   type        = string
@@ -294,40 +459,12 @@ variable "pubsub_publisher" {
   type        = string
   default     = "roles/pubsub.publisher"
 }
-
-########################### Bucket and files Variables ##############################
-
-variable "cloud_platform_scope" {
-  description = "The scope for the service account, such as 'cloud-platform'."
-  type        = string
-  default     = "cloud-platform"
+########################################### VPC CONNECT  VARIABLES #############################################
+variable "vpc_cidr_range" {
+  type    = string
+  default = "10.8.0.0/28" # Add or modify CIDR ranges as needed
 }
-
-variable "bucket_location" {
-  description = "pubsub location"
-  type        = string
-  default     = "US"
-}
-
-variable "archive_output_path" {
-  description = "archive_file"
-  type        = string
-  default     = "/tmp/serverless-fork.zip"
-}
-
-variable "archive_source_file" {
-  description = "archive_file"
-  type        = string
-  default     = "/Users/shreyajaiswal/Downloads/serverless-fork"
-}
-
-variable "archive_file_name" {
-  description = "archive_file"
-  type        = string
-  default     = "serverless-fork.zip"
-}
-
-########################### Cloud Function Variables ##############################
+########################################### Cloud Function VARIABLES ###########################################
 variable "cloud_function_name" {
   description = "Name of the Cloud Function"
   type        = string
@@ -376,14 +513,34 @@ variable "cloud_function_object" {
   default     = "function-source.zip"
 }
 
+variable "service_config_max_instance_count" {
+  description = "Time to live (TTL) for the DNS record set in seconds"
+  type        = number
+  default     = 3
+}
 
+variable "service_config_min_instance_count" {
+  description = "Time to live (TTL) for the DNS record set in seconds"
+  type        = number
+  default     = 1
+}
+
+variable "service_config_timeout_seconds" {
+  description = "Time to live (TTL) for the DNS record set in seconds"
+  type        = number
+  default     = 60
+}
+
+variable "service_config_ingress_settings" {
+  description = "cloud_function_role"
+  type        = string
+  default     = "ALLOW_INTERNAL_ONLY"
+}
 variable "cloud_function_role" {
   description = "cloud_function_role"
   type        = string
   default     = "roles/viewer"
 }
-
-
 ########################### ENV Variables ##############################
 variable "MAILGUN_API_KEY" {
   description = "mailgun-api-key"
@@ -397,64 +554,3 @@ variable "connector_name" {
   default     = "vpc_conn"
 }
 
-variable "deny_priority" {
-  description = "Priority for the deny-all-traffic firewall rule"
-  type        = number
-  default     = 1200
-}
-
-variable "deny_protocol" {
-  description = "deny_protocol"
-  type        = string
-  default     = "all"
-}
-
-variable "private_ip_address_purpose" {
-  description = "Purpose of the private IP address"
-  type        = string
-  default     = "VPC_PEERING"
-}
-
-variable "private_ip_address_type" {
-  description = "Type of the private IP address"
-  type        = string
-  default     = "INTERNAL"
-}
-
-variable "private_ip_address_prefix_length" {
-  description = "Prefix length of the private IP address"
-  type        = number
-  default     = 16
-}
-
-variable "service_name" {
-  description = "Name of the service"
-  type        = string
-  default     = "servicenetworking.googleapis.com"
-}
-
-
-variable "auto_create_subnetworks" {
-  description = "auto_create_subnetworks"
-  type        = bool
-  default     = false
-}
-
-variable "allow_protocol" {
-  description = "allow protocol"
-  type        = string
-  default     = "tcp"
-}
-
-variable "allowed_ports" {
-  description = "List of allowed ports"
-  type        = list(string)
-  default     = ["80", "8000"]
-}
-
-
-variable "allow_priority" {
-  description = "Priority for the deny-all-traffic firewall rule"
-  type        = number
-  default     = 1000
-}
