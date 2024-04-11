@@ -1,3 +1,18 @@
+terraform {
+
+  required_providers {
+    google = {
+      source  = "hashicorp/google"
+      version = "~>5"
+    }
+  }
+}
+
+#Provider Configuration
+provider "google" {
+  project = var.project_id
+  region  = var.region
+}
 ########################################## Create Key Ring to store Customer-Managed Encryption Keys (CMEK) ###################################
 resource "google_kms_key_ring" "key_ring" {
   name     = "my-key-ring-v7"
