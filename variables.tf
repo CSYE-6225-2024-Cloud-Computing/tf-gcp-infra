@@ -8,7 +8,7 @@ variable "project_id" {
 variable "region" {
   type        = string
   description = "GCP Region for this infrastructure"
-  default     =  "us-east4" #"us-central1"
+  default     = "us-east4" #"us-central1"
 }
 
 variable "zone" {
@@ -123,13 +123,13 @@ variable "webapp_route" {
 variable "webapp_route_dest_range" {
   description = "webapp_route_dest_range"
   type        = string
-  default     =  "0.0.0.0/0"
+  default     = "0.0.0.0/0"
 }
 
 variable "webapp_route_next_hop_gateway" {
   description = "webapp_route_next_hop_gateway"
   type        = string
-  default     =  "global/gateways/default-internet-gateway"
+  default     = "global/gateways/default-internet-gateway"
 }
 
 # #############################################  SERVICE ACCOUNT VARIABLES #############################################
@@ -417,7 +417,7 @@ variable "backend_balancing_mode" {
   default     = "UTILIZATION"
 }
 
- ############################################## GOOGLE DNS RECORD SET VARIABLES #############################################
+############################################## GOOGLE DNS RECORD SET VARIABLES #############################################
 variable "dns_record_set_name" {
   description = "Name of the DNS record set"
   type        = string
@@ -462,7 +462,7 @@ variable "pubsub_publisher" {
 ########################################### VPC CONNECT  VARIABLES #############################################
 variable "vpc_cidr_range" {
   type    = string
-  default = "10.8.0.0/28"  # Add or modify CIDR ranges as needed
+  default = "10.8.0.0/28" # Add or modify CIDR ranges as needed
 }
 ########################################### Cloud Function VARIABLES ###########################################
 variable "cloud_function_name" {

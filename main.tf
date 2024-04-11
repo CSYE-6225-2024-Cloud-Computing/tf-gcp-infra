@@ -16,21 +16,21 @@ provider "google" {
 ########################################## Create Key Ring to store Customer-Managed Encryption Keys (CMEK) ###################################
 resource "google_kms_key_ring" "key_ring" {
   name     = "my-key-ring-v7"
-  location = var.region  # Specify the region for the Key Ring
+  location = var.region # Specify the region for the Key Ring
 }
 
 ########################################## Customer-managed encryption keys (CMEK) for Virtual Machines ###################################
 resource "google_kms_crypto_key" "vm_crypt_key" {
-  key_ring  = google_kms_key_ring.key_ring.id
-  name      = "vm-crypt-key"
-  rotation_period = "2592000s"  # Set rotation period to 30 days
+  key_ring        = google_kms_key_ring.key_ring.id
+  name            = "vm-crypt-key"
+  rotation_period = "2592000s" # Set rotation period to 30 days
 }
 
 ########################################## Customer-managed encryption keys (CMEK) for CloudSQL Instances ###################################
 resource "google_kms_crypto_key" "cloudsql_crypt_key" {
-  key_ring  = google_kms_key_ring.key_ring.id
-  name      = "cloudsql_crypt_key"
-  rotation_period = "2592000s"  # Set rotation period to 30 days
+  key_ring        = google_kms_key_ring.key_ring.id
+  name            = "cloudsql_crypt_key"
+  rotation_period = "2592000s" # Set rotation period to 30 days
 }
 
 
@@ -90,11 +90,11 @@ resource "google_compute_firewall" "deny_all_traffic" {
 # ############################################# WEBAPP SUBNET #####################################################
 
 resource "google_compute_subnetwork" "webapp" {
-  count         = var.vpc_count
-  name          = var.subnet_webapp_name[count.index]
-  ip_cidr_range = var.subnet_CIDR_webapp[count.index]
-  region        = var.region
-  network       = google_compute_network.vpcnetwork[count.index].id
+  count                    = var.vpc_count
+  name                     = var.subnet_webapp_name[count.index]
+  ip_cidr_range            = var.subnet_CIDR_webapp[count.index]
+  region                   = var.region
+  network                  = google_compute_network.vpcnetwork[count.index].id
   private_ip_google_access = true
 }
 # ############################################# GLOBAL ADDRESS AND NETWORKING  CONNECTION ########################
@@ -158,8 +158,8 @@ resource "google_project_iam_binding" "Logging_Admin" {
 #CLOUD SQL INSTANCE
 resource "google_project_service_identity" "gcp_sa_cloud_sql" {
   provider = google-beta
-  project = var.project_id
-  service = "sqladmin.googleapis.com"
+  project  = var.project_id
+  service  = "sqladmin.googleapis.com"
 }
 resource "google_kms_crypto_key_iam_binding" "crypto_key-sql" {
   crypto_key_id = google_kms_crypto_key.cloudsql_crypt_key.id
@@ -186,7 +186,7 @@ resource "google_kms_crypto_key_iam_binding" "storage-binding" {
 resource "google_kms_crypto_key_iam_binding" "vm-instance-binding" {
   crypto_key_id = google_kms_crypto_key.vm_crypt_key.id
   role          = "roles/cloudkms.cryptoKeyEncrypterDecrypter"
-  members        = [
+  members = [
     "serviceAccount:service-680381513946@compute-system.iam.gserviceaccount.com"
   ]
 }
@@ -210,8 +210,8 @@ resource "google_sql_database_instance" "cloudsql_instance" {
       ipv4_enabled    = var.database_ipv4_enabled
       private_network = google_compute_network.vpcnetwork[count.index].id
     }
-}
-  encryption_key_name = google_kms_crypto_key.cloudsql_crypt_key.id   
+  }
+  encryption_key_name = google_kms_crypto_key.cloudsql_crypt_key.id
 
 }
 
@@ -357,10 +357,10 @@ resource "google_compute_region_autoscaler" "autoscaler" {
 ######################################## COMPUTE INSTANCE GROUP MANAGER ########################################
 
 resource "google_compute_region_instance_group_manager" "appserver" {
-  name                      = "appserver-igm"
-  count                     = var.vpc_count
-  base_instance_name        = "webapp"
-  region                    = var.region
+  name               = "appserver-igm"
+  count              = var.vpc_count
+  base_instance_name = "webapp"
+  region             = var.region
   #distribution_policy_zones = ["us-east4-c"]
   version {
     instance_template = google_compute_region_instance_template.vm_template[count.index].self_link
@@ -503,13 +503,13 @@ resource "google_storage_bucket" "bucket" {
   encryption {
     default_kms_key_name = google_kms_crypto_key.storage_crypt_key.id
   }
-  depends_on = [ google_kms_crypto_key_iam_binding.storage-binding ]
+  depends_on = [google_kms_crypto_key_iam_binding.storage-binding]
 }
 
 resource "google_storage_bucket_object" "cloudfunc_arch_name" {
   name   = "function-source.zip"
   bucket = google_storage_bucket.bucket.name
-  source = "function-source.zip"   
+  source = "function-source.zip"
 }
 
 
@@ -587,7 +587,7 @@ resource "google_cloudfunctions2_function" "function" {
 }
 
 resource "local_file" "output_file_data" {
-  count          = var.vpc_count 
+  count = var.vpc_count
   content = jsonencode({
     db_host     = google_sql_database_instance.cloudsql_instance[count.index].ip_address
     db_password = google_sql_user.cloudsql_user[count.index].password
